@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getInadimplencias } from "@/lib/actions/inadimplencia";
 import InadimplenciaClient from "./InadimplenciaClient";
 
