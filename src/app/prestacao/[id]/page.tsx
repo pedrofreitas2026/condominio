@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getPrestacao } from "@/lib/actions/prestacao";
 import { notFound } from "next/navigation";
 import PrestacaoDetalheClient from "./PrestacaoDetalheClient";
