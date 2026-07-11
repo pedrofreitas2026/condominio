@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { formatCurrency, formatMesReferencia } from "@/lib/utils";
 import Link from "next/link";
