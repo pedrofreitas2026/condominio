@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getCobrancas } from "@/lib/actions/cobrancas";
 import { formatCurrency, formatMesReferencia, formatDate } from "@/lib/utils";
 import Link from "next/link";

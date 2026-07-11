@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getCobranca } from "@/lib/actions/cobrancas";
 import { notFound } from "next/navigation";
 import CobrancaDetalheClient from "./CobrancaDetalheClient";

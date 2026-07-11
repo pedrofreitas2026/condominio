@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getApartamentos } from "@/lib/actions/apartamentos";
 import ApartamentosClient from "./ApartamentosClient";
 

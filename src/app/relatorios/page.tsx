@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getCobrancas } from "@/lib/actions/cobrancas";
 import { getPrestacoes } from "@/lib/actions/prestacao";
 import RelatoriosClient from "./RelatoriosClient";
