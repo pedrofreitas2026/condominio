@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Condominio {
+  id                    Int      @id @default(autoincrement())
+  nome                  String
+  cnpjPix               String   @map("cnpj_pix")
+  responsavel           String?
+  textoPadraoCobranca   String?  @map("texto_padrao_cobranca")
+  textoPadraoFundoObras String?  @map("texto_padrao_fundo_obras")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  apartamentos    Apartamento[]
+  cobrancasMensais CobrancaMensal[]
+  prestacoes      PrestacaoContas[]
+
+  @@map("condominios")
+}
+
+model Apartamento {
+  id            Int      @id @default(autoincrement())
+  condominioId  Int      @map("condominio_id")
+  numero        String
+  morador       String?
+  proprietario  String?
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  condominio    Condominio     @relation(fields: [condominioId], references: [id])
+  cobrancaItens CobrancaItem[]
+
+  @@unique([condominioId, numero])
+  @@map("apartamentos")
+}
+
+model CobrancaMensal {
+  id                   Int      @id @default(autoincrement())
+  condominioId         Int      @map("condominio_id")
+  mesReferencia        String   @map("mes_referencia") // formato: "2026-06"
+  dataVencimento       String   @map("data_vencimento") // formato: "2026-07-06"
+  taxaCondominioPadrao Float    @map("taxa_condominio_padrao")
+  taxaExtraPadrao      Float    @default(0) @map("taxa_extra_padrao")
+  precoGasM3Padrao     Float    @map("preco_gas_m3_padrao")
+  observacoes          String?
+  status               String   @default("aberta") // aberta, fechada
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  condominio Condominio     @relation(fields: [condominioId], references: [id])
+  itens      CobrancaItem[]
+
+  @@unique([condominioId, mesReferencia])
+  @@map("cobrancas_mensais")
+}
+
+model CobrancaItem {
+  id                Int      @id @default(autoincrement())
+  cobrancaMensalId  Int      @map("cobranca_mensal_id")
+  apartamentoId     Int      @map("apartamento_id")
+  taxaCondominio    Float    @map("taxa_condominio")
+  taxaExtra         Float    @default(0) @map("taxa_extra")
+  leituraAnteriorGas Float   @default(0) @map("leitura_anterior_gas")
+  leituraAtualGas   Float    @default(0) @map("leitura_atual_gas")
+  consumoGas        Float    @default(0) @map("consumo_gas")
+  precoGasM3        Float    @default(0) @map("preco_gas_m3")
+  valorGas          Float    @default(0) @map("valor_gas")
+  totalAPagar       Float    @default(0) @map("total_a_pagar")
+  valorPago         Float    @default(0) @map("valor_pago")
+  statusPagamento   String   @default("pendente") @map("status_pagamento") // pendente, pago, pago_parcial
+  dataPagamento     String?  @map("data_pagamento")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  cobrancaMensal CobrancaMensal @relation(fields: [cobrancaMensalId], references: [id], onDelete: Cascade)
+  apartamento    Apartamento    @relation(fields: [apartamentoId], references: [id])
+
+  @@unique([cobrancaMensalId, apartamentoId])
+  @@map("cobranca_itens")
+}
+
+model PrestacaoContas {
+  id                  Int      @id @default(autoincrement())
+  condominioId        Int      @map("condominio_id")
+  mesReferencia       String   @map("mes_referencia") // formato: "2026-06"
+  saldoMesAnterior    Float    @default(0) @map("saldo_mes_anterior")
+  totalReceitas       Float    @default(0) @map("total_receitas")
+  totalDespesas       Float    @default(0) @map("total_despesas")
+  creditoMes          Float    @default(0) @map("credito_mes")
+  totalAtrasos        Float    @default(0) @map("total_atrasos")
+  saldoReservaGas     Float    @default(0) @map("saldo_reserva_gas")
+  saldoContaCorrente  Float    @default(0) @map("saldo_conta_corrente")
+  saldoPoupanca       Float    @default(0) @map("saldo_poupanca")
+  status              String   @default("aberta") // aberta, fechada
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  condominio    Condominio              @relation(fields: [condominioId], references: [id])
+  receitas      Receita[]
+  despesas      Despesa[]
+  movimentacoes MovimentacaoFinanceira[]
+  atrasos       Atraso[]
+  creditos      Credito[]
+
+  @@unique([condominioId, mesReferencia])
+  @@map("prestacoes_contas")
+}
+
+model Receita {
+  id                Int      @id @default(autoincrement())
+  prestacaoContasId Int      @map("prestacao_contas_id")
+  descricao         String
+  valor             Float
+  origem            String   @default("manual") // manual, cobranca, inadimplencia
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  prestacaoContas PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
+
+  @@map("receitas")
+}
+
+model Despesa {
+  id                Int      @id @default(autoincrement())
+  prestacaoContasId Int      @map("prestacao_contas_id")
+  descricao         String
+  categoria         String?  // energia, agua, servico, banco, manutencao
+  valor             Float
+  dataPagamento     String?  @map("data_pagamento")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  prestacaoContas PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
+
+  @@map("despesas")
+}
+
+model MovimentacaoFinanceira {
+  id                Int      @id @default(autoincrement())
+  prestacaoContasId Int      @map("prestacao_contas_id")
+  conta             String   // reserva_gas, conta_corrente, poupanca
+  descricao         String
+  valor             Float
+  tipo              String   // entrada, saida, transferencia
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  prestacaoContas PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
+
+  @@map("movimentacoes_financeiras")
+}
+
+model Atraso {
+  id                Int             @id @default(autoincrement())
+  prestacaoContasId Int             @map("prestacao_contas_id")
+  mesReferencia     String          @map("mes_referencia")
+  valor             Float
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  prestacaoContas   PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
+
+  @@map("atrasos")
+}
+
+model Credito {
+  id                Int             @id @default(autoincrement())
+  prestacaoContasId Int             @map("prestacao_contas_id")
+  descricao         String
+  valor             Float
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  prestacaoContas   PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
+
+  @@map("creditos")
+}
+
