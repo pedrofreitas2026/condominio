@@ -1,4 +1,5 @@
-export const dynamic = 'force-dynamic'; import { getPrestacoes } from "@/lib/actions/prestacao";
+export const dynamic = 'force-dynamic';
+import { getPrestacoes } from "@/lib/actions/prestacao";
 import { formatCurrency, formatMesReferencia } from "@/lib/utils";
 import Link from "next/link";
 import NovaPrestacaoForm from "./NovaPrestacaoForm";
