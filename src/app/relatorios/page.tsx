@@ -7,5 +7,5 @@ export default async function RelatoriosPage() {
   const cobrancas = await getCobrancas();
   const prestacoes = await getPrestacoes();
 
-  return <RelatoriosClient cobrancas={cobrancas} prestacoes={prestacoes} />;
+  return <RelatoriosClient cobrancas={cobrancas as any} prestacoes={prestacoes as any} />;
 }
