@@ -62,32 +62,44 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  const handleDeletePrestacao = () => {
+    if (!confirm("Tem certeza que deseja excluir esta prestação de contas? Todas as receitas, despesas e movimentações associadas serão excluídas permanentemente.")) return;
+    startTransition(async () => {
+      await deletePrestacao(prestacao.id);
+      router.push("/prestacao");
+    });
+  };
+
   const [showReceitaForm, setShowReceitaForm] = useState(false);
   const [showDespesaForm, setShowDespesaForm] = useState(false);
   const [showMovForm, setShowMovForm] = useState(false);
   const [showAtrasoForm, setShowAtrasoForm] = useState(false);
-
   const [editReceita, setEditReceita] = useState<Receita | null>(null);
   const [editDespesa, setEditDespesa] = useState<Despesa | null>(null);
   const [editMov, setEditMov] = useState<Movimentacao | null>(null);
   const [editAtraso, setEditAtraso] = useState<Atraso | null>(null);
 
-  // Tratamento aritmético rigoroso para não concatenar strings
-  const saldoAnterior = parseFloat(String(prestacao.saldoMesAnterior || 0));
-  const totalReceitas = parseFloat(String(prestacao.totalReceitas || 0));
-  const totalDespesas = parseFloat(String(prestacao.totalDespesas || 0));
-  const totalAtrasos = prestacao.atrasos?.reduce((sum, a) => sum + parseFloat(String(a.valor || 0)), 0) ?? 0;
+  // Correção profunda do reduce para evitar concatenações de string no totalizador
+  const totalAtrasos = prestacao.atrasos?.reduce((sum, a) => {
+    const valorItem = parseFloat(String(a.valor || 0));
+    const acumuladorParcial = parseFloat(String(sum));
+    return acumuladorParcial + valorItem;
+  }, 0) ?? 0;
 
-  const totalReceitasPlanilha = saldoAnterior + totalReceitas;
-  const creditoMesCalculado = totalReceitasPlanilha - totalDespesas;
+  const saldoAcumulado = [
+    prestacao.saldoContaCorrente,
+    prestacao.saldoPoupanca,
+  ].reduce((total, saldo) => total + parseFloat(String(saldo ?? 0)), 0);
 
-  const movGas = prestacao.movimentacoes?.filter(m => m.conta === "reserva_gas") || [];
-  const movCC = prestacao.movimentacoes?.filter(m => m.conta === "conta_corrente") || [];
-  const movPoupança = prestacao.movimentacoes?.filter(m => m.conta === "poupanca") || [];
-
-  const saldoFinalGas = movGas.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(prestacao.saldoReservaGas || 0)));
-  const saldoFinalCC = movCC.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(prestacao.saldoContaCorrente || 0)));
-  const saldoFinalPoupanca = movPoupança.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(prestacao.saldoPoupanca || 0)));
+  const formatCurrency = (value: number | string | null | undefined) => {
+    const amount = Number(value ?? 0);
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
+  };
 
   const fmtNum = (value: number | string | null | undefined) => {
     const amount = Number(value ?? 0);
@@ -95,14 +107,6 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  };
-
-  const formatCurrency = (value: number | string | null | undefined) => {
-    const amount = Number(value ?? 0);
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(Number.isFinite(amount) ? amount : 0);
   };
 
   const handleAddReceita = async (formData: FormData) => {
@@ -121,10 +125,61 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     });
   };
 
+  const handleDeleteReceita = (id: number) => {
+    if (!confirm("Remover esta receita?")) return;
+    startTransition(async () => {
+      await deleteReceita(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const handleDeleteDespesa = (id: number) => {
+    if (!confirm("Remover esta despesa?")) return;
+    startTransition(async () => {
+      await deleteDespesa(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const handleEditReceita = async (formData: FormData) => {
+    if (!editReceita) return;
+    startTransition(async () => {
+      await updateReceita(editReceita.id, prestacao.id, formData);
+      setEditReceita(null);
+      router.refresh();
+    });
+  };
+
+  const handleEditDespesa = async (formData: FormData) => {
+    if (!editDespesa) return;
+    startTransition(async () => {
+      await updateDespesa(editDespesa.id, prestacao.id, formData);
+      setEditDespesa(null);
+      router.refresh();
+    });
+  };
+
   const handleAddMov = async (formData: FormData) => {
     startTransition(async () => {
       await addMovimentacao(prestacao.id, formData);
       setShowMovForm(false);
+      router.refresh();
+    });
+  };
+
+  const handleDeleteMov = (id: number) => {
+    if (!confirm("Remover esta movimentação?")) return;
+    startTransition(async () => {
+      await deleteMovimentacao(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const handleEditMov = async (formData: FormData) => {
+    if (!editMov) return;
+    startTransition(async () => {
+      await updateMovimentacao(editMov.id, prestacao.id, formData);
+      setEditMov(null);
       router.refresh();
     });
   };
@@ -137,314 +192,680 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     });
   };
 
+  const handleEditAtraso = async (formData: FormData) => {
+    if (!editAtraso) return;
+    startTransition(async () => {
+      await updateAtraso(editAtraso.id, prestacao.id, formData);
+      setEditAtraso(null);
+      router.refresh();
+    });
+  };
+
+  const handleDeleteAtraso = (id: number) => {
+    if (!confirm("Remover este atraso?")) return;
+    startTransition(async () => {
+      await deleteAtraso(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const contaLabel: Record<string, string> = {
+    reserva_gas: "Reserva p/ Gás",
+    conta_corrente: "Conta Corrente",
+    poupanca: "Poupança",
+  };
+
   return (
-    <div className="p-4 max-w-7xl mx-auto text-black bg-white min-h-screen">
+    <div className="fade-in">
+      {/* ============ PRINT LAYOUT ============ */}
+      <div className="print-layout">
+        <div style={{ textAlign: "center", marginBottom: "15px" }}>
+          <h1 style={{ fontSize: "16pt", fontWeight: "bold", margin: "0", border: "2px solid #333", padding: "8px", background: "#f0f0f0" }}>
+            {prestacao.condominio.nome.toUpperCase()}
+          </h1>
+          <h2 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0", border: "2px solid #000", borderTop: "none", padding: "6px" }}>
+            DEMONSTRATIVO DE PRESTAÇÃO DE CONTAS — MÊS: {formatMesReferencia(prestacao.mesReferencia).toUpperCase()}
+          </h2>
+        </div>
 
-      {/* CONTROLES DE SISTEMA (NÃO SAEM NA IMPRESSÃO) */}
-      <div className="flex items-center justify-between mb-6 p-4 bg-gray-100 border border-gray-300 rounded-xl no-print">
-        <Link href="/prestacao" className="text-gray-600 hover:text-black transition-colors font-medium">
-          ← Voltar para Lista
-        </Link>
-        <div className="flex gap-2">
-          <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-semibold hover:bg-blue-700 transition-colors">
-            🖨️ Imprimir Planilha
-          </button>
-          <button onClick={() => { if (confirm("Excluir tudo?")) { deletePrestacao(prestacao.id); router.push("/prestacao"); } }} className="bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 transition-colors">
-            Excluir
-          </button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px", alignItems: "start" }}>
+          {/* Column 1: Receitas & Resumo */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RECEITAS
+              </h3>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th className="print-th" style={{ textAlign: "left" }}>DESCRIÇÃO</th>
+                    <th className="print-th" style={{ textAlign: "right", width: "90px" }}>VALOR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prestacao.receitas.map((r) => (
+                    <tr key={r.id}>
+                      <td className="print-td">{r.descricao}</td>
+                      <td className="print-td print-td-right">R$ {fmtNum(r.valor)}</td>
+                    </tr>
+                  ))}
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">TOTAL RECEITAS</td>
+                    <td className="print-td print-td-right print-td-bold">R$ {fmtNum(prestacao.totalReceitas)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RESUMO FINANCEIRO DO MÊS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">(+) Receitas do Mês</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalReceitas)}</td>
+                  </tr>
+                  <tr>
+                    <td className="print-td">(-) Despesas do Mês</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalDespesas)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">(=) CRÉDITO DO MÊS</td>
+                    <td className="print-td print-td-right print-td-bold" style={{ color: (prestacao.totalReceitas - prestacao.totalDespesas) >= 0 ? "green" : "red" }}>
+                      R$ {fmtNum(prestacao.totalReceitas - prestacao.totalDespesas)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Column 2: Despesas */}
+          <div>
+            <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+              DESPESAS
+            </h3>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th className="print-th" style={{ textAlign: "left" }}>DESCRIÇÃO</th>
+                  <th className="print-th" style={{ textAlign: "right", width: "90px" }}>VALOR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prestacao.despesas.map((d) => (
+                  <tr key={d.id}>
+                    <td className="print-td">
+                      {d.descricao}
+                      {d.categoria && <span style={{ fontSize: "7px", border: "1px solid #999", padding: "1px 2px", borderRadius: "3px", marginLeft: "4px", textTransform: "uppercase" }}>{d.categoria}</span>}
+                    </td>
+                    <td className="print-td print-td-right">R$ {fmtNum(d.valor)}</td>
+                  </tr>
+                ))}
+                <tr className="print-totais">
+                  <td className="print-td print-td-bold">TOTAL DESPESAS</td>
+                  <td className="print-td print-td-right print-td-bold">R$ {fmtNum(prestacao.totalDespesas)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Column 3: Saldos & Atrasos */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RESERVA GÁS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">Reserva para Gás</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.saldoReservaGas)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">TOTAL RESERVA GÁS</td>
+                    <td className="print-td print-td-right print-td-bold">
+                      R$ {fmtNum(prestacao.saldoReservaGas)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                SALDOS DAS CONTAS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">Conta Corrente</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.saldoContaCorrente)}</td>
+                  </tr>
+                  <tr>
+                    <td className="print-td">Poupança</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.saldoPoupanca)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">SALDO ACUMULADO</td>
+                    <td className="print-td print-td-right print-td-bold">
+                      R$ {fmtNum(saldoAcumulado)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {prestacao.atrasos && prestacao.atrasos.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                  CONDOMÍNIOS EM ATRASO
+                </h3>
+                <table className="print-table">
+                  <tbody>
+                    {prestacao.atrasos.map((item) => (
+                      <tr key={item.id}>
+                        <td className="print-td" style={{ textTransform: "uppercase" }}>{item.mesReferencia}</td>
+                        <td className="print-td print-td-right">R$ {fmtNum(item.valor)}</td>
+                      </tr>
+                    ))}
+                    <tr className="print-totais">
+                      <td className="print-td print-td-bold">TOTAL</td>
+                      <td className="print-td print-td-right print-td-bold">R$ {fmtNum(totalAtrasos)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ============ CORPO EXCEL (ESTRUTURA DE MATRIZ IGUAL AO PRINT) ============ */}
-      <div className="excel-container mx-auto">
-
-        {/* Título Centralizado da Planilha */}
-        <div className="text-center font-serif mb-4">
-          <h1 className="text-base font-bold tracking-widest uppercase">PRESTAÇÃO DE CONTAS</h1>
-          <div className="grid grid-cols-6 max-w-xs mx-auto text-xs font-bold mt-2 border border-black divide-x divide-black">
-            <div className="col-span-2 bg-gray-100 py-0.5">MÊS:</div>
-            <div className="col-span-4 py-0.5 uppercase">{formatMesReferencia(prestacao.mesReferencia)}</div>
-          </div>
-        </div>
-
-        {/* Bloco Integrado Superior: Receitas vs Despesas */}
-        <div className="grid grid-cols-2 border-t border-x border-black divide-x divide-black text-[11px]">
-          <div className="text-center font-bold bg-white py-0.5 border-b border-black">Receitas</div>
-          <div className="text-center font-bold bg-white py-0.5 border-b border-black">DESPESAS</div>
-        </div>
-
-        <div className="grid grid-cols-2 border-x border-b border-black divide-x divide-black text-[10px]">
-          {/* Cabeçalhos de Colunas */}
-          <div className="grid grid-cols-3 font-bold text-center border-b border-black divide-x divide-black bg-white">
-            <div className="col-span-2 text-left px-2 py-0.5">DESCRIMINAÇÃO</div>
-            <div className="py-0.5">Valor</div>
-          </div>
-          <div className="grid grid-cols-3 font-bold text-center border-b border-black divide-x divide-black bg-white">
-            <div className="col-span-2 text-left px-2 py-0.5">DESCRIMINAÇÃO</div>
-            <div className="py-0.5">Valor</div>
-          </div>
-        </div>
-
-        {/* Linhas de Dados Lado a Lado */}
-        <div className="grid grid-cols-2 border-x border-b border-black divide-x divide-black text-[10px] items-start bg-white">
-
-          {/* Lado Esquerdo: Itens de Receita */}
-          <div className="divide-y divide-black">
-            <div className="grid grid-cols-3 divide-x divide-black font-medium">
-              <div className="col-span-2 px-2 py-0.5">SALDO MÊS ANTERIOR</div>
-              <div className="text-right px-2 py-0.5">R$ {fmtNum(saldoAnterior)}</div>
+      {/* ============ SCREEN LAYOUT ============ */}
+      <div className="screen-only">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <Link href="/prestacao" className="text-text-muted hover:text-text-primary transition-colors">
+                ← Prestação de Contas
+              </Link>
             </div>
-            {prestacao.receitas.map((r) => (
-              <div key={r.id} className="grid grid-cols-3 divide-x divide-black group">
-                <div className="col-span-2 px-2 py-0.5 uppercase flex justify-between">
-                  <span>{r.descricao}</span>
-                  <button onClick={async () => { if (confirm("Remover?")) { await deleteReceita(r.id, prestacao.id); router.refresh(); } }} className="no-print text-red-500 text-[8px]">([x])</button>
+            <h1 className="text-2xl font-bold text-text-primary">
+              {formatMesReferencia(prestacao.mesReferencia)}
+            </h1>
+          </div>
+          {/* Atualização pontual do botão de impressão mantendo o restante estático */}
+          <div className="flex gap-2 items-center no-print">
+            <button
+              onClick={() => window.print()}
+              className="bg-blue-600 text-white px-4 py-2 rounded font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-sm text-sm"
+            >
+              🖨️ Imprimir Planilha
+            </button>
+            <button onClick={handleDeletePrestacao} className="btn-danger flex items-center gap-1.5" disabled={isPending}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+              {isPending ? "Excluindo..." : "Excluir"}
+            </button>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="glass-card rounded-xl p-4">
+            <p className="text-sm text-text-secondary">Total Receitas</p>
+            <p className="text-xl font-bold text-emerald-400">{formatCurrency(prestacao.totalReceitas)}</p>
+          </div>
+          <div className="glass-card rounded-xl p-4">
+            <p className="text-sm text-text-secondary">Total Despesas</p>
+            <p className="text-xl font-bold text-red-400">{formatCurrency(prestacao.totalDespesas)}</p>
+          </div>
+          <div className="glass-card rounded-xl p-4">
+            <p className="text-sm text-text-secondary">Crédito do Mês</p>
+            <p className={`text-xl font-bold ${(prestacao.totalReceitas - prestacao.totalDespesas) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatCurrency(prestacao.totalReceitas - prestacao.totalDespesas)}
+            </p>
+          </div>
+          <div className="glass-card rounded-xl p-4">
+            <p className="text-sm text-text-secondary">Saldo Mês Anterior</p>
+            <p className="text-xl font-bold text-blue-400">{formatCurrency(prestacao.saldoMesAnterior)}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Receitas */}
+          <div className="glass-card rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title mb-0">Receitas</h2>
+              <button onClick={() => setShowReceitaForm(!showReceitaForm)} className="btn-primary text-xs py-1.5 no-print">
+                + Receita
+              </button>
+            </div>
+
+            {showReceitaForm && (
+              <form action={handleAddReceita} className="mb-4 p-3 bg-surface rounded-xl space-y-3 no-print">
+                <input name="descricao" required className="input-field" placeholder="Descrição" />
+                <input name="valor" type="number" required step="0.01" className="input-field" placeholder="Valor (R$)" />
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={() => setShowReceitaForm(false)} className="btn-secondary text-xs">Cancelar</button>
+                  <button type="submit" className="btn-primary text-xs" disabled={isPending}>Adicionar</button>
                 </div>
-                <div className="text-right px-2 py-0.5">R$ {fmtNum(r.valor)}</div>
-              </div>
-            ))}
-            {/* Espaçadores vazios para alinhar a grade */}
-            {Array.from({ length: Math.max(0, 6 - prestacao.receitas.length) }).map((_, i) => (
-              <div key={i} className="grid grid-cols-3 divide-x divide-black h-[17px]">
-                <div className="col-span-2"></div>
-                <div></div>
-              </div>
-            ))}
+              </form>
+            )}
 
-            {/* Sub-tabela de Atrasados em Amarelo colada dentro da Coluna */}
-            <div className="border-t border-black">
-              <div className="bg-yellow-300 font-bold px-2 py-0.5 border-b border-black tracking-wide uppercase">
-                CONDOMÍNIOS EM ATRASO
-              </div>
-              <div className="divide-y divide-black">
-                {prestacao.atrasos?.map((a) => (
-                  <div key={a.id} className="grid grid-cols-3 divide-x divide-black font-medium">
-                    <div className="px-2 py-0.5 uppercase">{a.mesReferencia}</div>
-                    <div className="col-span-2 text-left px-4 py-0.5">R$ {fmtNum(a.valor)}</div>
-                  </div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th className="text-right">Valor</th>
+                  <th className="text-center no-print">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prestacao.receitas.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      {r.descricao}
+                      {r.origem === "cobranca" && <span className="badge badge-info ml-2 text-[10px]">Auto</span>}
+                    </td>
+                    <td className="text-right text-emerald-400">{formatCurrency(r.valor)}</td>
+                    <td className="text-center no-print">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => setEditReceita(r)} className="text-primary-400 hover:text-primary-300 text-xs" title="Editar">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteReceita(r.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-                {Array.from({ length: Math.max(0, 2 - (prestacao.atrasos?.length || 0)) }).map((_, i) => (
-                  <div key={i} className="grid grid-cols-3 divide-x divide-black h-[17px]">
-                    <div></div>
-                    <div className="col-span-2"></div>
-                  </div>
-                ))}
-                <div className="grid grid-cols-3 divide-x divide-black font-bold bg-yellow-200">
-                  <div className="px-2 py-0.5">TOTAL</div>
-                  <div className="col-span-2 text-left px-4 py-0.5">R$ {fmtNum(totalAtrasos)}</div>
-                </div>
-              </div>
-            </div>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-bold">Total</td>
+                  <td className="text-right text-black font-bold">{formatCurrency(prestacao.totalReceitas)}</td>
+                  <td className="no-print"></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
-          {/* Lado Direito: Itens de Despesa */}
-          <div className="divide-y divide-black h-full">
-            {prestacao.despesas.map((d) => (
-              <div key={d.id} className="grid grid-cols-3 divide-x divide-black">
-                <div className="col-span-2 px-2 py-0.5 uppercase flex justify-between">
-                  <span>{d.descricao}</span>
-                  <button onClick={async () => { if (confirm("Remover?")) { await deleteDespesa(d.id, prestacao.id); router.refresh(); } }} className="no-print text-red-500 text-[8px]">([x])</button>
+          {/* Despesas */}
+          <div className="glass-card rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title mb-0">Despesas</h2>
+              <button onClick={() => setShowDespesaForm(!showDespesaForm)} className="btn-primary text-xs py-1.5 no-print">
+                + Despesa
+              </button>
+            </div>
+
+            {showDespesaForm && (
+              <form action={handleAddDespesa} className="mb-4 p-3 bg-surface rounded-xl space-y-3 no-print">
+                <input name="descricao" required className="input-field" placeholder="Descrição (ex: CEMIG)" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input name="valor" type="number" required step="0.01" className="input-field" placeholder="Valor (R$)" />
+                  <select name="categoria" className="input-field">
+                    <option value="">Categoria</option>
+                    <option value="energia">Energia</option>
+                    <option value="agua">Água</option>
+                    <option value="servico">Serviço</option>
+                    <option value="banco">Banco</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="outro">Outro</option>
+                  </select>
                 </div>
-                <div className="text-right px-2 py-0.5 font-medium">R$ {fmtNum(d.valor)}</div>
-              </div>
-            ))}
-            {/* Espaçadores vazios estendidos para fechar a altura simétrica */}
-            {Array.from({ length: Math.max(0, 12 - prestacao.despesas.length) }).map((_, i) => (
-              <div key={i} className="grid grid-cols-3 divide-x divide-black h-[17px]">
-                <div className="col-span-2"></div>
-                <div></div>
-              </div>
-            ))}
+                <input name="dataPagamento" type="date" className="input-field" />
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={() => setShowDespesaForm(false)} className="btn-secondary text-xs">Cancelar</button>
+                  <button type="submit" className="btn-primary text-xs" disabled={isPending}>Adicionar</button>
+                </div>
+              </form>
+            )}
+
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th className="text-right">Valor</th>
+                  <th className="text-center no-print">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prestacao.despesas.map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      {d.descricao}
+                      {d.categoria && <span className="badge badge-info ml-2 text-[10px]">{d.categoria}</span>}
+                    </td>
+                    <td className="text-right text-red-400">{formatCurrency(d.valor)}</td>
+                    <td className="text-center no-print">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => setEditDespesa(d)} className="text-primary-400 hover:text-primary-300 text-xs" title="Editar">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteDespesa(d.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-bold">Total</td>
+                  <td className="text-right text-red-400 font-bold">{formatCurrency(prestacao.totalDespesas)}</td>
+                  <td className="no-print"></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
 
-        {/* Linha Fina de Totais Gerais das Colunas */}
-        <div className="grid grid-cols-2 border-x border-b border-black divide-x divide-black text-[10px] font-bold bg-white">
-          <div className="grid grid-cols-3 divide-x divide-black">
-            <div className="col-span-2 px-2 py-0.5 text-center">TOTAL</div>
-            <div className="text-right px-2 py-0.5">R$ {fmtNum(totalReceitasPlanilha)}</div>
-          </div>
-          <div className="grid grid-cols-3 divide-x divide-black">
-            <div className="col-span-2 px-2 py-0.5 text-center">TOTAL</div>
-            <div className="text-right px-2 py-0.5">R$ {fmtNum(totalDespesas)}</div>
-          </div>
-        </div>
-
-        {/* Bloco de Destaque Central: Crédito do Mês */}
-        <div className="flex justify-center my-4">
-          <div className="grid grid-cols-2 border border-black text-[11px] font-bold bg-yellow-300 text-center shadow-sm">
-            <div className="px-4 py-1 border-r border-black uppercase tracking-wider">CRÉDITO DO MÊS</div>
-            <div className="px-6 py-1 text-right">
-              {creditoMesCalculado >= 0 ? "" : "-"}R$ {fmtNum(Math.abs(creditoMesCalculado))}
-            </div>
-          </div>
-        </div>
-
-        {/* Matriz Inferior das Três Contas Bancárias Correlatas */}
-        <div className="grid grid-cols-3 border border-black divide-x divide-black text-[9px] bg-white items-start">
-
-          {/* Caixa 1: Reserva para o Gás */}
-          <div className="flex flex-col h-full justify-between divide-y divide-black">
-            <div>
-              <div className="bg-gray-200 text-center font-bold border-b border-black py-0.5 uppercase">RESERVA PARA O GÁS</div>
-              <div className="divide-y divide-black">
-                <div className="grid grid-cols-2 divide-x divide-black font-medium">
-                  <div className="px-1.5 py-0.5">SALDO</div>
-                  <div className="text-right px-1.5 py-0.5">R$ {fmtNum(prestacao.saldoReservaGas)}</div>
+        {/* Edit Receita Modal */}
+        {editReceita && (
+          <div className="modal-overlay no-print" onClick={() => setEditReceita(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Receita</h2>
+              <form action={handleEditReceita} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Descrição *</label>
+                  <input name="descricao" required className="input-field" defaultValue={editReceita.descricao} />
                 </div>
-                {movGas.map((m) => (
-                  <div key={m.id} className="grid grid-cols-2 divide-x divide-black">
-                    <div className="px-1.5 py-0.5 uppercase flex justify-between">
-                      <span>{m.descricao}</span>
-                      <button onClick={async () => { await deleteMovimentacao(m.id, prestacao.id); router.refresh(); }} className="no-print text-red-500 text-[7px]">x</button>
-                    </div>
-                    <div className="text-right px-1.5 py-0.5">{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</div>
-                  </div>
-                ))}
-                {Array.from({ length: Math.max(0, 3 - movGas.length) }).map((_, i) => (
-                  <div key={i} className="grid grid-cols-2 divide-x divide-black h-[15px]">
-                    <div></div>
-                    <div></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white border-t border-black px-1.5 py-0.5 font-bold flex justify-between text-[10px]">
-              <span className="uppercase">{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</span>
-              <span>R$ {fmtNum(saldoFinalGas)}</span>
-            </div>
-          </div>
-
-          {/* Caixa 2: Conta Corrente */}
-          <div className="flex flex-col h-full justify-between divide-y divide-black">
-            <div>
-              <div className="bg-gray-200 text-center font-bold border-b border-black py-0.5 uppercase">CONTA CORRENTE</div>
-              <div className="divide-y divide-black">
-                <div className="grid grid-cols-2 divide-x divide-black font-medium">
-                  <div className="px-1.5 py-0.5 uppercase">{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</div>
-                  <div className="text-right px-1.5 py-0.5">R$ {fmtNum(prestacao.saldoContaCorrente)}</div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                  <input name="valor" type="number" required step="0.01" className="input-field" defaultValue={editReceita.valor} />
                 </div>
-                {movCC.map((m) => (
-                  <div key={m.id} className="grid grid-cols-2 divide-x divide-black">
-                    <div className="px-1.5 py-0.5 uppercase flex justify-between">
-                      <span>{m.descricao}</span>
-                      <button onClick={async () => { await deleteMovimentacao(m.id, prestacao.id); router.refresh(); }} className="no-print text-red-500 text-[7px]">x</button>
-                    </div>
-                    <div className="text-right px-1.5 py-0.5">{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</div>
-                  </div>
-                ))}
-                {Array.from({ length: Math.max(0, 3 - movCC.length) }).map((_, i) => (
-                  <div key={i} className="grid grid-cols-2 divide-x divide-black h-[15px]">
-                    <div></div>
-                    <div></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white border-t border-black px-1.5 py-0.5 font-bold flex justify-between text-[10px]">
-              <span className="uppercase">{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</span>
-              <span>R$ {fmtNum(saldoFinalCC)}</span>
-            </div>
-          </div>
-
-          {/* Caixa 3: Conta Poupança */}
-          <div className="flex flex-col h-full justify-between divide-y divide-black">
-            <div>
-              <div className="bg-gray-200 text-center font-bold border-b border-black py-0.5 uppercase">CONTA POUPANÇA</div>
-              <div className="divide-y divide-black">
-                <div className="grid grid-cols-2 divide-x divide-black font-medium">
-                  <div className="px-1.5 py-0.5">MÊS ANTERIOR</div>
-                  <div className="text-right px-1.5 py-0.5">R$ {fmtNum(prestacao.saldoPoupanca)}</div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditReceita(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
                 </div>
-                {movPoupança.map((m) => (
-                  <div key={m.id} className="grid grid-cols-2 divide-x divide-black">
-                    <div className="px-1.5 py-0.5 uppercase flex justify-between">
-                      <span>{m.descricao}</span>
-                      <button onClick={async () => { await deleteMovimentacao(m.id, prestacao.id); router.refresh(); }} className="no-print text-red-500 text-[7px]">x</button>
-                    </div>
-                    <div className="text-right px-1.5 py-0.5">{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</div>
-                  </div>
-                ))}
-                {Array.from({ length: Math.max(0, 3 - movPoupança.length) }).map((_, i) => (
-                  <div key={i} className="grid grid-cols-2 divide-x divide-black h-[15px]">
-                    <div></div>
-                    <div></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white border-t border-black px-1.5 py-0.5 font-bold flex justify-between text-[10px]">
-              <span className="uppercase">{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</span>
-              <span>R$ {fmtNum(saldoFinalPoupanca)}</span>
+              </form>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* CONTROLES DE ADIÇÃO EM TELA (NÃO IMPRIME DE JEITO NENHUM) */}
-        <div className="mt-4 p-3 bg-gray-50 border border-gray-300 rounded-lg space-y-2 no-print text-xs">
-          <div className="font-bold text-gray-700">Lançamentos Rápidos de Suporte:</div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => { setShowReceitaForm(!showReceitaForm); setShowDespesaForm(false); setShowAtrasoForm(false); setShowMovForm(false); }} className="bg-emerald-600 text-white px-2.5 py-1 rounded">+ Receita</button>
-            <button onClick={() => { setShowDespesaForm(!showDespesaForm); setShowReceitaForm(false); setShowAtrasoForm(false); setShowMovForm(false); }} className="bg-red-600 text-white px-2.5 py-1 rounded">+ Despesa</button>
-            <button onClick={() => { setShowAtrasoForm(!showAtrasoForm); setShowReceitaForm(false); setShowDespesaForm(false); setShowMovForm(false); }} className="bg-yellow-600 text-black font-semibold px-2.5 py-1 rounded">+ Historico Atraso</button>
-            <button onClick={() => { setShowMovForm(!showMovForm); setShowReceitaForm(false); setShowDespesaForm(false); setShowAtrasoForm(false); }} className="bg-gray-800 text-white px-2.5 py-1 rounded">+ Movimentar Saldo Interno</button>
+        {/* Edit Despesa Modal */}
+        {editDespesa && (
+          <div className="modal-overlay no-print" onClick={() => setEditDespesa(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Despesa</h2>
+              <form action={handleEditDespesa} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Descrição *</label>
+                  <input name="descricao" required className="input-field" defaultValue={editDespesa.descricao} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                    <input name="valor" type="number" required step="0.01" className="input-field" defaultValue={editDespesa.valor} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Categoria</label>
+                    <select name="categoria" className="input-field" defaultValue={editDespesa.categoria || ""}>
+                      <option value="">Nenhuma</option>
+                      <option value="energia">Energia</option>
+                      <option value="agua">Água</option>
+                      <option value="servico">Serviço</option>
+                      <option value="banco">Banco</option>
+                      <option value="manutencao">Manutenção</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Data do Pagamento</label>
+                  <input name="dataPagamento" type="date" className="input-field" defaultValue={editDespesa.dataPagamento || ""} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditDespesa(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Movimentação Modal */}
+        {editMov && (
+          <div className="modal-overlay no-print" onClick={() => setEditMov(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Movimentação</h2>
+              <form action={handleEditMov} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Conta *</label>
+                    <select name="conta" required className="input-field" defaultValue={editMov.conta}>
+                      <option value="reserva_gas">Reserva p/ Gás</option>
+                      <option value="conta_corrente">Conta Corrente</option>
+                      <option value="poupanca">Poupança</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Tipo *</label>
+                    <select name="tipo" required className="input-field" defaultValue={editMov.tipo}>
+                      <option value="entrada">Entrada</option>
+                      <option value="saida">Saída</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                  <input name="valor" type="number" required step="0.01" min="0" className="input-field" defaultValue={editMov.valor} />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Descrição *</label>
+                  <input name="descricao" required className="input-field" defaultValue={editMov.descricao} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditMov(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Account Balances */}
+        <div className="glass-card rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="section-title mb-0">Saldos das Contas</h2>
+            <button onClick={() => setShowMovForm(!showMovForm)} className="btn-secondary text-xs py-1.5 no-print">
+              + Movimentação
+            </button>
           </div>
 
-          {showReceitaForm && (
-            <form action={handleAddReceita} className="p-2 border bg-white space-y-2 rounded">
-              <input name="descricao" required placeholder="Discriminação da Receita" className="w-full border p-1" />
-              <input name="valor" type="number" required step="0.01" placeholder="Valor (R$)" className="w-full border p-1" />
-              <button type="submit" className="bg-black text-white px-3 py-1 rounded">Adicionar</button>
-            </form>
-          )}
-          {showDespesaForm && (
-            <form action={handleAddDespesa} className="p-2 border bg-white space-y-2 rounded">
-              <input name="descricao" required placeholder="Discriminação da Despesa" className="w-full border p-1" />
-              <input name="valor" type="number" required step="0.01" placeholder="Valor (R$)" className="w-full border p-1" />
-              <button type="submit" className="bg-black text-white px-3 py-1 rounded">Adicionar</button>
-            </form>
-          )}
-          {showAtrasoForm && (
-            <form action={handleAddAtraso} className="p-2 border bg-white space-y-2 rounded">
-              <input name="mesReferencia" required placeholder="Mês (ex: JUNHO)" className="w-full border p-1 uppercase" />
-              <input name="valor" type="number" required step="0.01" placeholder="Valor total em aberto" className="w-full border p-1" />
-              <button type="submit" className="bg-black text-white px-3 py-1 rounded">Adicionar</button>
-            </form>
-          )}
           {showMovForm && (
-            <form action={handleAddMov} className="p-2 border bg-white space-y-2 rounded grid grid-cols-2 gap-2">
-              <select name="conta" required className="border p-1">
-                <option value="reserva_gas">Reserva p/ Gás</option>
-                <option value="conta_corrente">Conta Corrente</option>
-                <option value="poupanca">Poupança</option>
-              </select>
-              <select name="tipo" required className="border p-1">
-                <option value="entrada">Entrada (+)</option>
-                <option value="saida">Saída (-)</option>
-              </select>
-              <input name="descricao" required placeholder="Histórico" className="border p-1 col-span-2" />
-              <input name="valor" type="number" required step="0.01" placeholder="Valor" className="border p-1 col-span-2" />
-              <button type="submit" className="bg-black text-white px-3 py-1 rounded col-span-2">Registrar Transação</button>
+            <form action={handleAddMov} className="mb-4 p-3 bg-surface rounded-xl space-y-3 no-print">
+              <div className="grid grid-cols-3 gap-2">
+                <select name="conta" required className="input-field">
+                  <option value="">Conta</option>
+                  <option value="reserva_gas">Reserva p/ Gás</option>
+                  <option value="conta_corrente">Conta Corrente</option>
+                  <option value="poupanca">Poupança</option>
+                </select>
+                <select name="tipo" required className="input-field">
+                  <option value="">Tipo</option>
+                  <option value="entrada">Entrada</option>
+                  <option value="saida">Saída</option>
+                </select>
+                <input name="valor" type="number" required step="0.01" min="0" className="input-field" placeholder="Valor" />
+              </div>
+              <input name="descricao" required className="input-field" placeholder="Descrição" />
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setShowMovForm(false)} className="btn-secondary text-xs">Cancelar</button>
+                <button type="submit" className="btn-primary text-xs" disabled={isPending}>Adicionar</button>
+              </div>
             </form>
           )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-surface rounded-xl p-4 border border-border">
+              <p className="text-sm text-text-secondary mb-1">Reserva para Gás</p>
+              <p className="text-xl font-bold text-blue-400">{formatCurrency(prestacao.saldoReservaGas)}</p>
+            </div>
+            <div className="bg-surface rounded-xl p-4 border border-border">
+              <p className="text-sm text-text-secondary mb-1">Conta Corrente</p>
+              <p className="text-xl font-bold text-emerald-400">{formatCurrency(prestacao.saldoContaCorrente)}</p>
+            </div>
+            <div className="bg-surface rounded-xl p-4 border border-border">
+              <p className="text-sm text-text-secondary mb-1">Poupança</p>
+              <p className="text-xl font-bold text-purple-400">{formatCurrency(prestacao.saldoPoupanca)}</p>
+            </div>
+          </div>
+
+          {/* Movimentações list */}
+          {prestacao.movimentacoes.length > 0 && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Conta</th>
+                  <th>Descrição</th>
+                  <th>Tipo</th>
+                  <th className="text-right">Valor</th>
+                  <th className="text-center no-print">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prestacao.movimentacoes.map((m) => (
+                  <tr key={m.id}>
+                    <td>{contaLabel[m.conta] || m.conta}</td>
+                    <td>{m.descricao}</td>
+                    <td>
+                      <span className={`badge ${m.tipo === "entrada" ? "badge-success" : "badge-danger"}`}>
+                        {m.tipo}
+                      </span>
+                    </td>
+                    <td className={`text-right ${m.tipo === "entrada" ? "text-emerald-400" : "text-red-400"}`}>
+                      {formatCurrency(m.valor)}
+                    </td>
+                    <td className="text-center no-print">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => setEditMov(m)} className="text-primary-400 hover:text-primary-300 text-xs" title="Editar">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteMov(m.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
+
+        {/* Condomínios em Atraso */}
+        <div className="glass-card rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="section-title mb-0">Condomínios em Atraso</h2>
+            <button onClick={() => setShowAtrasoForm(!showAtrasoForm)} className="btn-primary text-xs py-1.5 no-print">
+              + Atraso
+            </button>
+          </div>
+
+          {showAtrasoForm && (
+            <form action={handleAddAtraso} className="mb-4 p-3 bg-surface rounded-xl space-y-3 no-print">
+              <div className="grid grid-cols-2 gap-2">
+                <input name="mesReferencia" required className="input-field" placeholder="Mês (ex: MAIO)" />
+                <input name="valor" type="number" required step="0.01" className="input-field" placeholder="Valor (R$)" />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setShowAtrasoForm(false)} className="btn-secondary text-xs">Cancelar</button>
+                <button type="submit" className="btn-primary text-xs" disabled={isPending}>Adicionar</button>
+              </div>
+            </form>
+          )}
+
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Mês de Referência</th>
+                <th className="text-right">Valor em Aberto</th>
+                <th className="text-center no-print" style={{ width: "100px" }}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prestacao.atrasos && prestacao.atrasos.length > 0 ? (
+                prestacao.atrasos.map((item) => (
+                  <tr key={item.id}>
+                    <td className="font-medium" style={{ textTransform: "uppercase" }}>{item.mesReferencia}</td>
+                    <td className="text-right text-red-400 font-semibold">{formatCurrency(item.valor)}</td>
+                    <td className="text-center no-print">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => setEditAtraso(item)} className="text-primary-400 hover:text-primary-300 text-xs" title="Editar">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteAtraso(item.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="text-center text-text-muted text-sm py-4">Nenhum atraso registrado.</td>
+                </tr>
+              )}
+            </tbody>
+            {prestacao.atrasos && prestacao.atrasos.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td className="font-bold">Total</td>
+                  <td className="text-right text-red-400 font-bold">{formatCurrency(totalAtrasos)}</td>
+                  <td className="no-print"></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        {/* Edit Atraso Modal */}
+        {editAtraso && (
+          <div className="modal-overlay no-print" onClick={() => setEditAtraso(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Atraso</h2>
+              <form action={handleEditAtraso} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Mês de Referência *</label>
+                  <input name="mesReferencia" required className="input-field" defaultValue={editAtraso.mesReferencia} />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                  <input name="valor" type="number" required step="0.01" className="input-field" defaultValue={editAtraso.valor} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditAtraso(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ESTILOS DE MATRIZ DE TABELA CONTÍNUA EXCEL */}
+      {/* Força o renderizador do Chrome/Firefox a manter os backgrounds cinza e amarelo na folha física */}
       <style jsx global>{`
-        .excel-container {
-          width: 790px;
-          padding: 10px;
-          background: #ffffff;
-        }
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
-          .excel-container { width: 100% !important; padding: 0 !important; margin: 0 !important; transform: scale(1); }
+          body { background: white !important; color: black !important; padding: 0 !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
-
     </div>
   );
 }
