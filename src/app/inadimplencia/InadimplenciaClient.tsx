@@ -14,16 +14,7 @@ export default function InadimplenciaClient({
   const [isPending, startTransition] = useTransition();
   const [payModal, setPayModal] = useState<Inadimplente | null>(null);
 
-  const totalEmAberto = inadimplencias.reduce((sum, i) => {
-    // 1. Força a conversão do valor do item para String e extrai o número com parseFloat
-    const valorItem = parseFloat(String(i.valorEmAberto || 0));
-
-    // 2. Garante que o acumulador parcial seja tratado estritamente como número
-    const acumuladorParcial = parseFloat(String(sum));
-
-    // 3. Retorna a soma aritmética pura
-    return acumuladorParcial + valorItem;
-  }, 0);
+  const totalEmAberto = inadimplencias.reduce((sum, i) => sum + i.valorEmAberto, 0);
 
   const handlePagar = async (formData: FormData) => {
     if (!payModal) return;
