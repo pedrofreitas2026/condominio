@@ -14,7 +14,12 @@ export default function InadimplenciaClient({
   const [isPending, startTransition] = useTransition();
   const [payModal, setPayModal] = useState<Inadimplente | null>(null);
 
-  const totalEmAberto = inadimplencias.reduce((sum, i) => sum + Number(i.valorEmAberto || 0), 0);
+  const totalEmAberto = inadimplencias.reduce((sum, i) => {
+    // Converte o valor atual estritamente para número decimal
+    const valorNum = parseFloat(String(i.valorEmAberto)) || 0;
+    // Garante que o acumulador anterior também seja tratado como número
+    return Number(sum) + valorNum;
+  }, 0); // O zero inicial garante que a soma comece como número puro
 
   const handlePagar = async (formData: FormData) => {
     if (!payModal) return;
@@ -35,10 +40,7 @@ export default function InadimplenciaClient({
           <h1 className="text-2xl font-bold text-text-primary">Inadimplência</h1>
           <p className="text-text-secondary mt-1">
             {inadimplencias.length} pendência(s) · Total em aberto:{" "}
-            <span className="text-red-400 font-semibold">
-              {/* Garante a conversão para número nativo na hora de formatar */}
-              {formatCurrency(Number(totalEmAberto))}
-            </span>
+            <span className="text-red-400 font-semibold">{formatCurrency(totalEmAberto)}</span>
           </p>
         </div>
       </div>
