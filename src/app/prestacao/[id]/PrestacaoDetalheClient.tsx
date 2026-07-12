@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addReceita, addDespesa, deleteReceita, deleteDespesa, addMovimentacao, updateReceita, updateDespesa, deleteMovimentacao, updateMovimentacao, deletePrestacao, addAtraso, updateAtraso, deleteAtraso } from "@/lib/actions/prestacao";
-import { formatCurrency, formatMesReferencia } from "@/lib/utils";
+import { formatMesReferencia } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -82,6 +82,15 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     (sum, atraso) => sum + Number(atraso.valor),
     0
   ) ?? 0;
+
+  const formatCurrency = (value: number | string | null | undefined) => {
+    const amount = Number(value ?? 0);
+
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(Number.isFinite(amount) ? amount : 0);
+  };
 
   const fmtNum = (num: number) =>
     num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
