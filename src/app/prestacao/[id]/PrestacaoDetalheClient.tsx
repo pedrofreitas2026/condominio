@@ -83,11 +83,6 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     0
   ) ?? 0;
 
-  const saldoAcumulado = [
-    prestacao.saldoContaCorrente,
-    prestacao.saldoPoupanca,
-  ].reduce((total, saldo) => total + Number(saldo ?? 0), 0);
-
   const formatCurrency = (value: number | string | null | undefined) => {
     const amount = Number(value ?? 0);
 
@@ -348,7 +343,7 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
                   <tr className="print-totais">
                     <td className="print-td print-td-bold">SALDO ACUMULADO</td>
                     <td className="print-td print-td-right print-td-bold">
-                      R$ {fmtNum(saldoAcumulado)}
+                      R$ {fmtNum(prestacao.saldoContaCorrente + prestacao.saldoPoupanca)}
                     </td>
                   </tr>
                 </tbody>
