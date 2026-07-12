@@ -89,6 +89,8 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(Number.isFinite(amount) ? amount : 0);
   };
 
@@ -98,6 +100,14 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     return (Number.isFinite(amount) ? amount : 0).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
+    });
+  };
+
+  const handleAddReceita = async (formData: FormData) => {
+    startTransition(async () => {
+      await addReceita(prestacao.id, formData);
+      setShowReceitaForm(false);
+      router.refresh();
     });
   };
 
