@@ -15,11 +15,15 @@ export default function InadimplenciaClient({
   const [payModal, setPayModal] = useState<Inadimplente | null>(null);
 
   const totalEmAberto = inadimplencias.reduce((sum, i) => {
-    // Converte o valor atual estritamente para número decimal
-    const valorNum = parseFloat(String(i.valorEmAberto)) || 0;
-    // Garante que o acumulador anterior também seja tratado como número
-    return Number(sum) + valorNum;
-  }, 0); // O zero inicial garante que a soma comece como número puro
+    // 1. Força a conversão do valor do item para String e extrai o número com parseFloat
+    const valorItem = parseFloat(String(i.valorEmAberto || 0));
+
+    // 2. Garante que o acumulador parcial seja tratado estritamente como número
+    const acumuladorParcial = parseFloat(String(sum));
+
+    // 3. Retorna a soma aritmética pura
+    return acumuladorParcial + valorItem;
+  }, 0);
 
   const handlePagar = async (formData: FormData) => {
     if (!payModal) return;
