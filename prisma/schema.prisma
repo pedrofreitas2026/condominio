@@ -1,6 +1,6 @@
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -17,22 +17,22 @@ model Condominio {
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
-  apartamentos    Apartamento[]
+  apartamentos     Apartamento[]
   cobrancasMensais CobrancaMensal[]
-  prestacoes      PrestacaoContas[]
+  prestacoes       PrestacaoContas[]
 
   @@map("condominios")
 }
 
 model Apartamento {
-  id            Int      @id @default(autoincrement())
-  condominioId  Int      @map("condominio_id")
-  numero        String
-  morador       String?
-  proprietario  String?
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement())
+  condominioId Int      @map("condominio_id")
+  numero       String
+  morador      String?
+  proprietario String?
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   condominio    Condominio     @relation(fields: [condominioId], references: [id])
   cobrancaItens CobrancaItem[]
@@ -42,17 +42,17 @@ model Apartamento {
 }
 
 model CobrancaMensal {
-  id                   Int      @id @default(autoincrement())
-  condominioId         Int      @map("condominio_id")
-  mesReferencia        String   @map("mes_referencia") // formato: "2026-06"
-  dataVencimento       String   @map("data_vencimento") // formato: "2026-07-06"
-  taxaCondominioPadrao Float    @map("taxa_condominio_padrao")
-  taxaExtraPadrao      Float    @default(0) @map("taxa_extra_padrao")
-  precoGasM3Padrao     Float    @map("preco_gas_m3_padrao")
-  observacoes          String?
-  status               String   @default("aberta") // aberta, fechada
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                  Int      @id @default(autoincrement())
+  condominioId        Int      @map("condominio_id")
+  mesReferencia       String   @map("mes_referencia") // formato: "2026-06"
+  dataVencimento      DateTime @map("data_vencimento") // Alterado para DateTime para validação real de calendário
+  taxaCondominioPadrao Decimal  @db.Decimal(10, 2) @map("taxa_condominio_padrao")
+  taxaExtraPadrao     Decimal  @db.Decimal(10, 2) @default(0.00) @map("taxa_extra_padrao")
+  precoGasM3Padrao    Decimal  @db.Decimal(10, 2) @map("preco_gas_m3_padrao")
+  observacoes         String?
+  status              String   @default("aberta") // aberta, fechada
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   condominio Condominio     @relation(fields: [condominioId], references: [id])
   itens      CobrancaItem[]
@@ -62,22 +62,22 @@ model CobrancaMensal {
 }
 
 model CobrancaItem {
-  id                Int      @id @default(autoincrement())
-  cobrancaMensalId  Int      @map("cobranca_mensal_id")
-  apartamentoId     Int      @map("apartamento_id")
-  taxaCondominio    Float    @map("taxa_condominio")
-  taxaExtra         Float    @default(0) @map("taxa_extra")
-  leituraAnteriorGas Float   @default(0) @map("leitura_anterior_gas")
-  leituraAtualGas   Float    @default(0) @map("leitura_atual_gas")
-  consumoGas        Float    @default(0) @map("consumo_gas")
-  precoGasM3        Float    @default(0) @map("preco_gas_m3")
-  valorGas          Float    @default(0) @map("valor_gas")
-  totalAPagar       Float    @default(0) @map("total_a_pagar")
-  valorPago         Float    @default(0) @map("valor_pago")
-  statusPagamento   String   @default("pendente") @map("status_pagamento") // pendente, pago, pago_parcial
-  dataPagamento     String?  @map("data_pagamento")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id                 Int       @id @default(autoincrement())
+  cobrancaMensalId   Int       @map("cobranca_mensal_id")
+  apartamentoId      Int       @map("apartamento_id")
+  taxaCondominio     Decimal   @db.Decimal(10, 2) @map("taxa_condominio")
+  taxaExtra          Decimal   @db.Decimal(10, 2) @default(0.00) @map("taxa_extra")
+  leituraAnteriorGas Decimal   @db.Decimal(10, 2) @default(0.00) @map("leitura_anterior_gas")
+  leituraAtualGas    Decimal   @db.Decimal(10, 2) @default(0.00) @map("leitura_atual_gas")
+  consumoGas         Decimal   @db.Decimal(10, 2) @default(0.00) @map("consumo_gas")
+  precoGasM3         Decimal   @db.Decimal(10, 2) @default(0.00) @map("preco_gas_m3")
+  valorGas           Decimal   @db.Decimal(10, 2) @default(0.00) @map("valor_gas")
+  totalAPagar        Decimal   @db.Decimal(10, 2) @default(0.00) @map("total_a_pagar")
+  valorPago          Decimal   @db.Decimal(10, 2) @default(0.00) @map("valor_pago")
+  statusPagamento    String    @default("pendente") @map("status_pagamento") // pendente, pago
+  dataPagamento      DateTime? @map("data_pagamento") // Alterado para DateTime para salvar o dia exato da baixa
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   cobrancaMensal CobrancaMensal @relation(fields: [cobrancaMensalId], references: [id], onDelete: Cascade)
   apartamento    Apartamento    @relation(fields: [apartamentoId], references: [id])
@@ -87,27 +87,27 @@ model CobrancaItem {
 }
 
 model PrestacaoContas {
-  id                  Int      @id @default(autoincrement())
-  condominioId        Int      @map("condominio_id")
-  mesReferencia       String   @map("mes_referencia") // formato: "2026-06"
-  saldoMesAnterior    Float    @default(0) @map("saldo_mes_anterior")
-  totalReceitas       Float    @default(0) @map("total_receitas")
-  totalDespesas       Float    @default(0) @map("total_despesas")
-  creditoMes          Float    @default(0) @map("credito_mes")
-  totalAtrasos        Float    @default(0) @map("total_atrasos")
-  saldoReservaGas     Float    @default(0) @map("saldo_reserva_gas")
-  saldoContaCorrente  Float    @default(0) @map("saldo_conta_corrente")
-  saldoPoupanca       Float    @default(0) @map("saldo_poupanca")
-  status              String   @default("aberta") // aberta, fechada
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  id                 Int      @id @default(autoincrement())
+  condominioId       Int      @map("condominio_id")
+  mesReferencia      String   @map("mes_referencia") // formato: "2026-06"
+  saldoMesAnterior   Decimal  @db.Decimal(10, 2) @default(0.00) @map("saldo_mes_anterior")
+  totalReceitas      Decimal  @db.Decimal(10, 2) @default(0.00) @map("total_receitas")
+  totalDespesas      Decimal  @db.Decimal(10, 2) @default(0.00) @map("total_despesas")
+  creditoMes         Decimal  @db.Decimal(10, 2) @default(0.00) @map("credito_mes")
+  totalAtrasos       Decimal  @db.Decimal(10, 2) @default(0.00) @map("total_atrasos")
+  saldoReservaGas    Decimal  @db.Decimal(10, 2) @default(0.00) @map("saldo_reserva_gas")
+  saldoContaCorrente Decimal  @db.Decimal(10, 2) @default(0.00) @map("saldo_conta_corrente")
+  saldoPoupanca      Decimal  @db.Decimal(10, 2) @default(0.00) @map("saldo_poupanca")
+  status             String   @default("aberta") // aberta, fechada
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
-  condominio    Condominio              @relation(fields: [condominioId], references: [id])
-  receitas      Receita[]
-  despesas      Despesa[]
+  condominio   Condominio             @relation(fields: [condominioId], references: [id])
+  receitas     Receita[]
+  despesas     Despesa[]
   movimentacoes MovimentacaoFinanceira[]
-  atrasos       Atraso[]
-  creditos      Credito[]
+  atrasos      Atraso[]
+  creditos     Credito[]
 
   @@unique([condominioId, mesReferencia])
   @@map("prestacoes_contas")
@@ -117,7 +117,7 @@ model Receita {
   id                Int      @id @default(autoincrement())
   prestacaoContasId Int      @map("prestacao_contas_id")
   descricao         String
-  valor             Float
+  valor             Decimal  @db.Decimal(10, 2)
   origem            String   @default("manual") // manual, cobranca, inadimplencia
   createdAt         DateTime @default(now()) @map("created_at")
 
@@ -131,7 +131,7 @@ model Despesa {
   prestacaoContasId Int      @map("prestacao_contas_id")
   descricao         String
   categoria         String?  // energia, agua, servico, banco, manutencao
-  valor             Float
+  valor             Decimal  @db.Decimal(10, 2)
   dataPagamento     String?  @map("data_pagamento")
   createdAt         DateTime @default(now()) @map("created_at")
 
@@ -145,7 +145,7 @@ model MovimentacaoFinanceira {
   prestacaoContasId Int      @map("prestacao_contas_id")
   conta             String   // reserva_gas, conta_corrente, poupanca
   descricao         String
-  valor             Float
+  valor             Decimal  @db.Decimal(10, 2)
   tipo              String   // entrada, saida, transferencia
   createdAt         DateTime @default(now()) @map("created_at")
 
@@ -155,11 +155,11 @@ model MovimentacaoFinanceira {
 }
 
 model Atraso {
-  id                Int             @id @default(autoincrement())
-  prestacaoContasId Int             @map("prestacao_contas_id")
-  mesReferencia     String          @map("mes_referencia")
-  valor             Float
-  createdAt         DateTime        @default(now()) @map("created_at")
+  id                Int      @id @default(autoincrement())
+  prestacaoContasId Int      @map("prestacao_contas_id")
+  mesReferencia     String   @map("mes_referencia")
+  valor             Decimal  @db.Decimal(10, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
 
   prestacaoContas   PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
 
@@ -167,14 +167,13 @@ model Atraso {
 }
 
 model Credito {
-  id                Int             @id @default(autoincrement())
-  prestacaoContasId Int             @map("prestacao_contas_id")
+  id                Int      @id @default(autoincrement())
+  prestacaoContasId Int      @map("prestacao_contas_id")
   descricao         String
-  valor             Float
-  createdAt         DateTime        @default(now()) @map("created_at")
+  valor             Decimal  @db.Decimal(10, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
 
   prestacaoContas   PrestacaoContas @relation(fields: [prestacaoContasId], references: [id], onDelete: Cascade)
 
   @@map("creditos")
 }
-
