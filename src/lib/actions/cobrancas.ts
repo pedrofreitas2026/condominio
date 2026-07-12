@@ -86,8 +86,12 @@ export async function createCobranca(formData: FormData) {
   const cobranca = await prisma.cobrancaMensal.create({
     data: {
       condominioId: 1,
+      // Retorna a string pura ("2026-06") para satisfazer o tipo esperado do banco
       mesReferencia,
-      dataVencimento,
+
+      // Mantém a conversão para Date ISO que resolveu o erro anterior
+      dataVencimento: new Date(`${dataVencimento}T00:00:00.000Z`),
+
       taxaCondominioPadrao,
       taxaExtraPadrao,
       precoGasM3Padrao,
@@ -104,7 +108,7 @@ export async function createCobranca(formData: FormData) {
             consumoGas: 0,
             precoGasM3: 0,
             valorGas: 0,
-            totalAPagar: taxaCondominioPadrao + taxaExtraPadrao,
+            totalAPagar: Number(taxaCondominioPadrao) + Number(taxaExtraPadrao),
           };
         }),
       },
