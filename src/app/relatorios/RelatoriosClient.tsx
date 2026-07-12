@@ -45,27 +45,17 @@ interface Despesa {
   categoria: string | null;
 }
 
-interface Atraso {
-  id: number;
-  mesReferencia: string;
-  valor: number;
-}
-
 interface Prestacao {
   id: number;
   mesReferencia: string;
-  saldoMesAnterior: number;
   totalReceitas: number;
   totalDespesas: number;
   creditoMes: number;
-  totalAtrasos: number;
   saldoReservaGas: number;
   saldoContaCorrente: number;
   saldoPoupanca: number;
   receitas: Receita[];
   despesas: Despesa[];
-  atrasos?: Atraso[];
-  movimentacoes?: any[];
 }
 
 type ReportType = "cobranca" | "prestacao";
@@ -83,49 +73,31 @@ export default function RelatoriosClient({
   const selectedCobranca = cobrancas.find((c) => c.id === selectedId);
   const selectedPrestacao = prestacoes.find((p) => p.id === selectedId);
 
-  const fmtNum = (value: number | string | null | undefined) => {
-    const amount = Number(value ?? 0);
-    return (Number.isFinite(amount) ? amount : 0).toLocaleString("pt-BR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
   const formatCurrency = (value: number | string | null | undefined) => {
     const amount = Number(value ?? 0);
+
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(Number.isFinite(amount) ? amount : 0);
   };
 
-  // Cálculos internos da Prestação de Contas (Evitando concatenações de string)
-  const saldoAnterior = selectedPrestacao ? parseFloat(String(selectedPrestacao.saldoMesAnterior || 0)) : 0;
-  const tReceitas = selectedPrestacao ? parseFloat(String(selectedPrestacao.totalReceitas || 0)) : 0;
-  const tDespesas = selectedPrestacao ? parseFloat(String(selectedPrestacao.totalDespesas || 0)) : 0;
-  const totalAtrasos = selectedPrestacao?.atrasos?.reduce((sum, a) => sum + parseFloat(String(a.valor || 0)), 0) ?? 0;
-  const totalReceitasPlanilha = saldoAnterior + tReceitas;
-  const creditoMesCalculado = totalReceitasPlanilha - tDespesas;
-
-  const movGas = selectedPrestacao?.movimentacoes?.filter(m => m.conta === "reserva_gas") || [];
-  const movCC = selectedPrestacao?.movimentacoes?.filter(m => m.conta === "conta_corrente") || [];
-  const movPoupança = selectedPrestacao?.movimentacoes?.filter(m => m.conta === "poupanca") || [];
-
-  const saldoFinalGas = selectedPrestacao ? movGas.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(selectedPrestacao.saldoReservaGas || 0))) : 0;
-  const saldoFinalCC = selectedPrestacao ? movCC.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(selectedPrestacao.saldoContaCorrente || 0))) : 0;
-  const saldoFinalPoupanca = selectedPrestacao ? movPoupança.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(selectedPrestacao.saldoPoupanca || 0))) : 0;
+  // Armazena o cálculo dinâmico da prestação selecionada
+  const valorCreditoDeficit = selectedPrestacao
+    ? selectedPrestacao.totalReceitas - selectedPrestacao.totalDespesas
+    : 0;
 
   return (
-    <div className="fade-in text-black">
-
-      {/* ============ CABEÇALHO DO PAINEL (NÃO IMPRIME) ============ */}
-      <div className="flex items-center justify-between mb-8 no-print">
+    <div className="fade-in">
+      <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Relatórios</h1>
           <p className="text-text-secondary mt-1">Gere relatórios para impressão</p>
         </div>
         {selectedId && (
-          <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-sm text-sm">
+          <button onClick={() => window.print()} className="btn-primary no-print">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect width="12" height="8" x="6" y="14" />
             </svg>
@@ -134,8 +106,8 @@ export default function RelatoriosClient({
         )}
       </div>
 
-      {/* CONTROLES DO FILTRO DE SELEÇÃO (NÃO IMPRIME) */}
-      <div className="glass-card rounded-2xl p-5 mb-6 no-print text-white">
+      {/* Controls */}
+      <div className="glass-card rounded-2xl p-5 mb-6 no-print">
         <div className="flex flex-wrap gap-4 items-end">
           <div>
             <label className="block text-sm text-text-secondary mb-1">Tipo de Relatório</label>
@@ -176,406 +148,156 @@ export default function RelatoriosClient({
         </div>
       </div>
 
-      {/* ============ VISUALIZAÇÃO EM TELA / PREVIEW (MANTIDA ORIGINAL) ============ */}
-      <div className="no-print">
-        {tipo === "cobranca" && selectedCobranca && (
-          <div className="glass-card rounded-2xl p-6">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
-              <h3 className="text-lg text-text-secondary mt-1">
-                TAXA — {formatMesReferencia(selectedCobranca.mesReferencia)}
-              </h3>
-              <p className="text-sm text-text-muted mt-1">
-                Vencimento: {formatDate(selectedCobranca.dataVencimento)}
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Apto</th>
-                    <th className="text-right">Taxa Cond.</th>
-                    <th className="text-right">Taxa Extra</th>
-                    <th className="text-right">Leit. Ant.</th>
-                    <th className="text-right">Leit. Atual</th>
-                    <th className="text-right">Consumo</th>
-                    <th className="text-right">Preço m³</th>
-                    <th className="text-right">Valor Gás</th>
-                    <th className="text-right">Total</th>
+      {/* Billing Report */}
+      {tipo === "cobranca" && selectedCobranca && (
+        <div className="glass-card rounded-2xl p-6">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
+            <h3 className="text-lg text-text-secondary mt-1">
+              TAXA — {formatMesReferencia(selectedCobranca.mesReferencia)}
+            </h3>
+            <p className="text-sm text-text-muted mt-1">
+              Vencimento: {formatDate(selectedCobranca.dataVencimento)}
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Apto</th>
+                  <th className="text-right">Taxa Cond.</th>
+                  <th className="text-right">Taxa Extra</th>
+                  <th className="text-right">Leit. Ant.</th>
+                  <th className="text-right">Leit. Atual</th>
+                  <th className="text-right">Consumo</th>
+                  <th className="text-right">Preço m³</th>
+                  <th className="text-right">Valor Gás</th>
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedCobranca.itens.map((item) => (
+                  <tr key={item.id}>
+                    <td className="font-semibold">{item.apartamento.numero}</td>
+                    <td className="text-right">{formatCurrency(item.taxaCondominio)}</td>
+                    <td className="text-right">{formatCurrency(item.taxaExtra)}</td>
+                    <td className="text-right">{item.leituraAnteriorGas}</td>
+                    <td className="text-right">{item.leituraAtualGas}</td>
+                    <td className="text-right">{item.consumoGas}</td>
+                    <td className="text-right">{formatCurrency(item.precoGasM3)}</td>
+                    <td className="text-right">{formatCurrency(item.valorGas)}</td>
+                    <td className="text-right font-semibold">{formatCurrency(item.totalAPagar)}</td>
                   </tr>
-                </thead>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-bold">Totais</td>
+                  <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalTaxas)}</td>
+                  <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalExtras)}</td>
+                  <td></td>
+                  <td></td>
+                  <td className="text-right font-bold">{selectedCobranca.totalConsumoGas}</td>
+                  <td></td>
+                  <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalGas)}</td>
+                  <td className="text-right font-bold text-primary-300">{formatCurrency(selectedCobranca.totalGeral)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Financial Statement Report */}
+      {tipo === "prestacao" && selectedPrestacao && (
+        <div className="glass-card rounded-2xl p-6">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
+            <h3 className="text-lg text-text-secondary mt-1">
+              Prestação de Contas — {formatMesReferencia(selectedPrestacao.mesReferencia)}
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Receitas */}
+            <div>
+              <h4 className="font-bold text-emerald-400 mb-3">Receitas</h4>
+              <table className="data-table">
                 <tbody>
-                  {selectedCobranca.itens.map((item) => (
-                    <tr key={item.id}>
-                      <td className="font-semibold">{item.apartamento.numero}</td>
-                      <td className="text-right">{formatCurrency(item.taxaCondominio)}</td>
-                      <td className="text-right">{formatCurrency(item.taxaExtra)}</td>
-                      <td className="text-right">{item.leituraAnteriorGas}</td>
-                      <td className="text-right">{item.leituraAtualGas}</td>
-                      <td className="text-right">{item.consumoGas}</td>
-                      <td className="text-right">{formatCurrency(item.precoGasM3)}</td>
-                      <td className="text-right">{formatCurrency(item.valorGas)}</td>
-                      <td className="text-right font-semibold">{formatCurrency(item.totalAPagar)}</td>
+                  {selectedPrestacao.receitas.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.descricao}</td>
+                      <td className="text-right text-emerald-400">{formatCurrency(r.valor)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td className="font-bold">Totais</td>
-                    <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalTaxas)}</td>
-                    <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalExtras)}</td>
-                    <td></td>
-                    <td></td>
-                    <td className="text-right font-bold">{selectedCobranca.totalConsumoGas}</td>
-                    <td></td>
-                    <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalGas)}</td>
-                    <td className="text-right font-bold text-primary-300">{formatCurrency(selectedCobranca.totalGeral)}</td>
+                    <td className="font-bold">Total Receitas</td>
+                    <td className="text-right text-emerald-400 font-bold">{formatCurrency(selectedPrestacao.totalReceitas)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Despesas */}
+            <div>
+              <h4 className="font-bold text-red-400 mb-3">Despesas</h4>
+              <table className="data-table">
+                <tbody>
+                  {selectedPrestacao.despesas.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.descricao}</td>
+                      <td className="text-right text-red-400">{formatCurrency(d.valor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="font-bold">Total Despesas</td>
+                    <td className="text-right text-red-400 font-bold">{formatCurrency(selectedPrestacao.totalDespesas)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </div>
-        )}
 
-        {tipo === "prestacao" && selectedPrestacao && (
-          <div className="glass-card rounded-2xl p-6">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
-              <h3 className="text-lg text-text-secondary mt-1">
-                Prestação de Contas — {formatMesReferencia(selectedPrestacao.mesReferencia)}
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-bold text-emerald-400 mb-3">Receitas</h4>
-                <table className="data-table">
-                  <tbody>
-                    {selectedPrestacao.receitas.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.descricao}</td>
-                        <td className="text-right text-emerald-400">{formatCurrency(r.valor)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td className="font-bold">Total Receitas</td>
-                      <td className="text-right text-emerald-400 font-bold">{formatCurrency(selectedPrestacao.totalReceitas)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              <div>
-                <h4 className="font-bold text-red-400 mb-3">Despesas</h4>
-                <table className="data-table">
-                  <tbody>
-                    {selectedPrestacao.despesas.map((d) => (
-                      <tr key={d.id}>
-                        <td>{d.descricao}</td>
-                        <td className="text-right text-red-400">{formatCurrency(d.valor)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td className="font-bold">Total Despesas</td>
-                      <td className="text-right text-red-400 font-bold">{formatCurrency(selectedPrestacao.totalDespesas)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-            <div className="mt-6 p-4 bg-surface rounded-xl border border-border text-center">
-              <p className="text-text-secondary mb-1">Crédito/Déficit do Mês</p>
-              <p className={`text-2xl font-bold ${creditoMesCalculado >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                {formatCurrency(creditoMesCalculado)}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ============ ESTRUTURAS DE IMPRESSÃO COMPLETA (EXCLUSIVO PARA @MEDIA PRINT) ============ */}
-
-      {/* 1. IMPRESSÃO INTEGRAL DA COBRANÇA (IGUAL À PÁGINA DE DETALHES) */}
-      {tipo === "cobranca" && selectedCobranca && (
-        <div className="print-only-container class-cobranca-print bg-white p-4 border border-black">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold uppercase tracking-wider">Condomínio José Marcolini</h2>
-            <h3 className="text-base font-semibold text-gray-700 mt-1 uppercase underline">
-              RELATÓRIO DE TAXAS MENSAL — {formatMesReferencia(selectedCobranca.mesReferencia)}
-            </h3>
-            <p className="text-xs text-gray-600 mt-1 font-mono">
-              Vencimento: {formatDate(selectedCobranca.dataVencimento)}
+          {/* Result */}
+          <div className="mt-6 p-4 bg-surface rounded-xl border border-border text-center">
+            <p className="text-text-secondary mb-1">Crédito/Déficit do Mês</p>
+            <p className={`text-2xl font-bold ${valorCreditoDeficit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatCurrency(valorCreditoDeficit)}
             </p>
           </div>
 
-          <table className="w-full text-[10px] border-collapse border border-black text-black bg-white">
-            <thead>
-              <tr className="bg-gray-100 font-bold">
-                <th className="border border-black p-2 text-center">APTO</th>
-                <th className="border border-black p-2 text-right">TAXA COND.</th>
-                <th className="border border-black p-2 text-right">TAXA EXTRA</th>
-                <th className="border border-black p-2 text-right">LEIT. ANT.</th>
-                <th className="border border-black p-2 text-right">LEIT. ATUAL</th>
-                <th className="border border-black p-2 text-right">CONSUMO</th>
-                <th className="border border-black p-2 text-right">PREÇO M³</th>
-                <th className="border border-black p-2 text-right">VALOR GÁS</th>
-                <th className="border border-black p-2 text-right">TOTAL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedCobranca.itens.map((item) => (
-                <tr key={item.id} className="border-b border-black">
-                  <td className="border border-black p-1.5 font-bold text-center">{item.apartamento.numero}</td>
-                  <td className="border border-black p-1.5 text-right">R$ {fmtNum(item.taxaCondominio)}</td>
-                  <td className="border border-black p-1.5 text-right">R$ {fmtNum(item.taxaExtra)}</td>
-                  <td className="border border-black p-1.5 text-right font-mono">{item.leituraAnteriorGas}</td>
-                  <td className="border border-black p-1.5 text-right font-mono">{item.leituraAtualGas}</td>
-                  <td className="border border-black p-1.5 text-right font-mono">{item.consumoGas}</td>
-                  <td className="border border-black p-1.5 text-right">R$ {fmtNum(item.precoGasM3)}</td>
-                  <td className="border border-black p-1.5 text-right">R$ {fmtNum(item.valorGas)}</td>
-                  <td className="border border-black p-1.5 text-right font-bold">R$ {fmtNum(item.totalAPagar)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 font-bold border-t-2 border-black">
-                <td className="border border-black p-2 text-center uppercase">Totais</td>
-                <td className="border border-black p-2 text-right">R$ {fmtNum(selectedCobranca.totalTaxas)}</td>
-                <td className="border border-black p-2 text-right">R$ {fmtNum(selectedCobranca.totalExtras)}</td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2 text-right font-mono">{selectedCobranca.totalConsumoGas}</td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2 text-right">R$ {fmtNum(selectedCobranca.totalGas)}</td>
-                <td className="border border-black p-2 text-right text-base border-l-2">R$ {fmtNum(selectedCobranca.totalGeral)}</td>
-              </tr>
-            </tfoot>
-          </table>
+          {/* Balances */}
+          <div className="mt-6 grid grid-cols-3 gap-4">
+            <div className="p-3 bg-surface rounded-xl border border-border text-center">
+              <p className="text-xs text-text-muted mb-1">Reserva Gás</p>
+              <p className="font-bold text-blue-400">{formatCurrency(selectedPrestacao.saldoReservaGas)}</p>
+            </div>
+            <div className="p-3 bg-surface rounded-xl border border-border text-center">
+              <p className="text-xs text-text-muted mb-1">Conta Corrente</p>
+              <p className="font-bold text-emerald-400">{formatCurrency(selectedPrestacao.saldoContaCorrente)}</p>
+            </div>
+            <div className="p-3 bg-surface rounded-xl border border-border text-center">
+              <p className="text-xs text-text-muted mb-1">Poupança</p>
+              <p className="font-bold text-purple-400">{formatCurrency(selectedPrestacao.saldoPoupanca)}</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* 2. IMPRESSÃO INTEGRAL DA PRESTAÇÃO (MÉTODO PLANILHA EXCEL FIEL DA IMAGEM) */}
-      {tipo === "prestacao" && selectedPrestacao && (
-        <div className="print-only-container class-prestacao-print bg-white p-2">
-
-          <div className="text-center mb-4">
-            <h1 className="text-base font-bold tracking-widest uppercase">PRESTAÇÃO DE CONTAS</h1>
-            <table style={{ margin: "10px auto 0 auto", borderCollapse: "collapse", border: "1px solid black", fontSize: "10pt" }}>
-              <tbody>
-                <tr>
-                  <td style={{ border: "1px solid black", padding: "3px 15px", fontWeight: "bold", background: "#f2f2f2" }}>MÊS:</td>
-                  <td style={{ border: "1px solid black", padding: "3px 30px", fontWeight: "bold", textTransform: "uppercase" }}>{formatMesReferencia(selectedPrestacao.mesReferencia)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid black", fontSize: "9pt", backgroundColor: "white" }}>
-            <thead>
-              <tr style={{ fontWeight: "bold", textAlign: "center" }}>
-                <th colSpan={2} style={{ border: "1px solid black", padding: "4px" }}>Receitas</th>
-                <th colSpan={2} style={{ border: "1px solid black", padding: "4px" }}>DESPESAS</th>
-              </tr>
-              <tr style={{ fontWeight: "bold" }}>
-                <th style={{ border: "1px solid black", padding: "4px", textAlign: "left", width: "35%" }}>DESCRIMINAÇÃO</th>
-                <th style={{ border: "1px solid black", padding: "4px", textAlign: "right", width: "15%" }}>Valor</th>
-                <th style={{ border: "1px solid black", padding: "4px", textAlign: "left", width: "35%" }}>DESCRIMINAÇÃO</th>
-                <th style={{ border: "1px solid black", padding: "4px", textAlign: "right", width: "15%" }}>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ border: "1px solid black", padding: "3px 6px" }}>SALDO MÊS ANTERIOR</td>
-                <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>R$ {fmtNum(saldoAnterior)}</td>
-                <td style={{ border: "1px solid black", padding: "3px 6px" }}>{selectedPrestacao.despesas[0]?.descricao.toUpperCase() || ""}</td>
-                <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>{selectedPrestacao.despesas[0] ? `R$ ${fmtNum(selectedPrestacao.despesas[0].valor)}` : ""}</td>
-              </tr>
-
-              {Array.from({ length: Math.max(10, selectedPrestacao.receitas.length, selectedPrestacao.despesas.length - 1) }).map((_, index) => {
-                const rItem = selectedPrestacao.receitas[index];
-                const dItem = selectedPrestacao.despesas[index + 1];
-
-                return (
-                  <tr key={index}>
-                    <td style={{ border: "1px solid black", padding: "3px 6px" }}>{rItem?.descricao.toUpperCase() || ""}</td>
-                    <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>{rItem ? `R$ ${fmtNum(rItem.valor)}` : ""}</td>
-                    <td style={{ border: "1px solid black", padding: "3px 6px" }}>{dItem?.descricao.toUpperCase() || ""}</td>
-                    <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>{dItem ? `R$ ${fmtNum(dItem.valor)}` : ""}</td>
-                  </tr>
-                );
-              })}
-
-              <tr style={{ background: "#ffff00", fontWeight: "bold" }}>
-                <td colSpan={2} style={{ border: "1px solid black", padding: "4px 6px" }}>CONDOMÍNIOS EM ATRASO</td>
-                <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-                <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-              </tr>
-
-              {Array.from({ length: Math.max(3, selectedPrestacao.atrasos?.length || 0) }).map((_, index) => {
-                const aItem = selectedPrestacao.atrasos?.[index];
-                return (
-                  <tr key={`atraso-${index}`}>
-                    <td style={{ border: "1px solid black", padding: "3px 6px", textTransform: "uppercase" }}>{aItem?.mesReferencia || ""}</td>
-                    <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "left" }}>{aItem ? `R$ ${fmtNum(aItem.valor)}` : ""}</td>
-                    <td style={{ border: "1px solid black" }}></td>
-                    <td style={{ border: "1px solid black" }}></td>
-                  </tr>
-                );
-              })}
-
-              <tr style={{ background: "#ffff99", fontWeight: "bold" }}>
-                <td style={{ border: "1px solid black", padding: "3px 6px" }}>TOTAL</td>
-                <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "left" }}>R$ {fmtNum(totalAtrasos)}</td>
-                <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-                <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-              </tr>
-
-              <tr style={{ height: "15px" }}><td style={{ border: "1px solid black" }}></td><td style={{ border: "1px solid black" }}></td><td style={{ border: "1px solid black" }}></td><td style={{ border: "1px solid black" }}></td></tr>
-
-              <tr style={{ fontWeight: "bold" }}>
-                <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "center" }}>TOTAL</td>
-                <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "right" }}>R$ {fmtNum(totalReceitasPlanilha)}</td>
-                <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "center" }}>TOTAL</td>
-                <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "right" }}>R$ {fmtNum(tDespesas)}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={{ display: "flex", justifyContent: "center", margin: "15px 0" }}>
-            <table style={{ borderCollapse: "collapse", border: "1px solid black", fontWeight: "bold", fontSize: "10pt" }}>
-              <tbody>
-                <tr style={{ background: "#ffff00" }}>
-                  <td style={{ border: "1px solid black", padding: "4px 20px" }}>CRÉDITO DO MÊS</td>
-                  <td style={{ border: "1px solid black", padding: "4px 25px", textAlign: "right" }}>
-                    {creditoMesCalculado >= 0 ? "" : "-"}R$ {fmtNum(Math.abs(creditoMesCalculado))}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0px", border: "1px solid black", backgroundColor: "white", fontSize: "8pt" }}>
-
-            <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid black" }}>
-              <div style={{ background: "#d9d9d9", textAlign: "center", fontWeight: "bold", borderBottom: "1px solid black", padding: "3px" }}>RESERVA PARA O GÁS</div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  <tr style={{ borderBottom: "1px solid black" }}>
-                    <td style={{ padding: "3px 5px", borderRight: "1px solid black" }}>SALDO</td>
-                    <td style={{ padding: "3px 5px", textAlign: "right" }}>R$ {fmtNum(selectedPrestacao.saldoReservaGas)}</td>
-                  </tr>
-                  {movGas.map((m: any) => (
-                    <tr key={m.id} style={{ borderBottom: "1px solid black" }}>
-                      <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{m.descricao}</td>
-                      <td style={{ padding: "3px 5px", textAlign: "right" }}>{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ borderTop: "1px solid black", padding: "3px 5px", fontWeight: "bold", display: "flex", justifyContent: "space-between", fontSize: "9pt", marginTop: "auto" }}>
-                <span style={{ textTransform: "uppercase" }}>{formatMesReferencia(selectedPrestacao.mesReferencia).split(" ")[0]}</span>
-                <span>R$ {fmtNum(saldoFinalGas)}</span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid black" }}>
-              <div style={{ background: "#d9d9d9", textAlign: "center", fontWeight: "bold", borderBottom: "1px solid black", padding: "3px" }}>CONTA CORRENTE</div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  <tr style={{ borderBottom: "1px solid black" }}>
-                    <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{formatMesReferencia(selectedPrestacao.mesReferencia).split(" ")[0]}</td>
-                    <td style={{ padding: "3px 5px", textAlign: "right" }}>R$ {fmtNum(selectedPrestacao.saldoContaCorrente)}</td>
-                  </tr>
-                  {movCC.map((m: any) => (
-                    <tr key={m.id} style={{ borderBottom: "1px solid black" }}>
-                      <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{m.descricao}</td>
-                      <td style={{ padding: "3px 5px", textAlign: "right" }}>{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ borderTop: "1px solid black", padding: "3px 5px", fontWeight: "bold", display: "flex", justifyContent: "space-between", fontSize: "9pt", marginTop: "auto" }}>
-                <span style={{ textTransform: "uppercase" }}>{formatMesReferencia(selectedPrestacao.mesReferencia).split(" ")[0]}</span>
-                <span>R$ {fmtNum(saldoFinalCC)}</span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ background: "#d9d9d9", textAlign: "center", fontWeight: "bold", borderBottom: "1px solid black", padding: "3px" }}>CONTA POUPANÇA</div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  <tr style={{ borderBottom: "1px solid black" }}>
-                    <td style={{ padding: "3px 5px", borderRight: "1px solid black" }}>MÊS ANTERIOR</td>
-                    <td style={{ padding: "3px 5px", textAlign: "right" }}>R$ {fmtNum(selectedPrestacao.saldoPoupanca)}</td>
-                  </tr>
-                  {movPoupança.map((m: any) => (
-                    <tr key={m.id} style={{ borderBottom: "1px solid black" }}>
-                      <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{m.descricao}</td>
-                      <td style={{ padding: "3px 5px", textAlign: "right" }}>{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ borderTop: "1px solid black", padding: "3px 5px", fontWeight: "bold", display: "flex", justifyContent: "space-between", fontSize: "9pt", marginTop: "auto" }}>
-                <span style={{ textTransform: "uppercase" }}>{formatMesReferencia(selectedPrestacao.mesReferencia).split(" ")[0]}</span>
-                <span>R$ {fmtNum(saldoFinalPoupanca)}</span>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* NENHUM PERÍODO SELECIONADO (NÃO IMPRIME) */}
+      {/* No selection */}
       {!selectedId && (
-        <div className="glass-card rounded-2xl p-12 text-center no-print">
+        <div className="glass-card rounded-2xl p-12 text-center">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-text-muted">
             <path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m7 17 4-8 4 4 4-6" />
           </svg>
           <p className="text-text-secondary text-lg">Selecione um período para gerar o relatório</p>
         </div>
       )}
-
-      {/* ============ DIRETIVAS CSS DE MEDIA PRINT MÚLTIPLAS ============ */}
-      <style jsx global>{`
-        /* Esconde os containers estruturais de impressão na tela */
-        .print-only-container {
-          display: none;
-        }
-
-        @media print {
-          /* Desativa elementos de tela e controles */
-          .no-print, .screen-only { 
-            display: none !important; 
-          }
-          /* Ativa o container de folha física */
-          .print-only-container { 
-            display: block !important; 
-            width: 100% !important;
-            max-width: 790px !important;
-            margin: 0 auto !important;
-            background: white !important;
-            color: black !important;
-          }
-          body { 
-            background: white !important; 
-            color: black !important; 
-            padding: 0 !important; 
-            margin: 0 !important; 
-          }
-          /* Força injeção de cores do Excel (Cinza e Amarelos) */
-          * { 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
-          }
-          table, th, td, div {
-            border-color: #000000 !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
