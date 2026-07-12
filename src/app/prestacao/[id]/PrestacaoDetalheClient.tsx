@@ -92,14 +92,12 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     }).format(Number.isFinite(amount) ? amount : 0);
   };
 
-  const fmtNum = (num: number) =>
-    num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtNum = (value: number | string | null | undefined) => {
+    const amount = Number(value ?? 0);
 
-  const handleAddReceita = async (formData: FormData) => {
-    startTransition(async () => {
-      await addReceita(prestacao.id, formData);
-      setShowReceitaForm(false);
-      router.refresh();
+    return (Number.isFinite(amount) ? amount : 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     });
   };
 
