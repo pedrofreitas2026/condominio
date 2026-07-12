@@ -51,11 +51,11 @@ export default async function PrestacaoPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-text-secondary">Receitas</span>
-                    <span className="text-emerald-400">{formatCurrency(p.totalReceitas)}</span>
+                    <span className="text-emerald-400">{formatCurrency(Number(p.totalReceitas))}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-secondary">Despesas</span>
-                    <span className="text-red-400">{formatCurrency(p.totalDespesas)}</span>
+                    <span className="text-red-400">{formatCurrency(Number(p.totalDespesas))}</span>
                   </div>
                   <div className="flex justify-between border-t border-border pt-2 mt-2">
                     <span className="text-text-secondary font-semibold">Crédito/Déficit</span>
