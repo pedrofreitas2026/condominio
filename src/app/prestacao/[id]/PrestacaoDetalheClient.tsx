@@ -78,7 +78,10 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
   const [editMov, setEditMov] = useState<Movimentacao | null>(null);
   const [editAtraso, setEditAtraso] = useState<Atraso | null>(null);
 
-  const totalAtrasos = prestacao.atrasos ? prestacao.atrasos.reduce((sum, a) => sum + a.valor, 0) : 0;
+  const totalAtrasos = prestacao.atrasos?.reduce(
+    (sum, atraso) => sum + Number(atraso.valor),
+    0
+  ) ?? 0;
 
   const fmtNum = (num: number) =>
     num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
