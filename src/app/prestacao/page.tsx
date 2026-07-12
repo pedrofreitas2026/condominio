@@ -31,7 +31,7 @@ export default async function PrestacaoPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {prestacoes.map((p) => {
             // Realiza o cálculo dinâmico para cada item da lista externa
-            const valorCreditoDeficit = p.totalReceitas - p.totalDespesas;
+            const valorCreditoDeficit = Number(p.totalReceitas) - Number(p.totalDespesas);
 
             return (
               <Link
