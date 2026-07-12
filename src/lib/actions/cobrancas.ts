@@ -22,12 +22,12 @@ export async function getCobrancas() {
 
   return cobrancas.map((c) => ({
     ...c,
-    totalGeral: c.itens.reduce((sum, item) => sum + item.totalAPagar, 0),
-    totalPago: c.itens.reduce((sum, item) => sum + item.valorPago, 0),
-    totalTaxas: c.itens.reduce((sum, item) => sum + item.taxaCondominio, 0),
-    totalExtras: c.itens.reduce((sum, item) => sum + item.taxaExtra, 0),
-    totalGas: c.itens.reduce((sum, item) => sum + item.valorGas, 0),
-    totalConsumoGas: c.itens.reduce((sum, item) => sum + item.consumoGas, 0),
+    totalGeral: c.itens.reduce((sum, item) => sum + Number(item.totalAPagar), 0),
+    totalPago: c.itens.reduce((sum, item) => sum + Number(item.valorPago), 0),
+    totalTaxas: c.itens.reduce((sum, item) => sum + Number(item.taxaCondominio), 0),
+    totalExtras: c.itens.reduce((sum, item) => sum + Number(item.taxaExtra), 0),
+    totalGas: c.itens.reduce((sum, item) => sum + Number(item.valorGas), 0),
+    totalConsumoGas: c.itens.reduce((sum, item) => sum + Number(item.consumoGas), 0),
   }));
 }
 
@@ -47,12 +47,12 @@ export async function getCobranca(id: number) {
 
   return {
     ...cobranca,
-    totalGeral: cobranca.itens.reduce((sum, item) => sum + item.totalAPagar, 0),
-    totalPago: cobranca.itens.reduce((sum, item) => sum + item.valorPago, 0),
-    totalTaxas: cobranca.itens.reduce((sum, item) => sum + item.taxaCondominio, 0),
-    totalExtras: cobranca.itens.reduce((sum, item) => sum + item.taxaExtra, 0),
-    totalGas: cobranca.itens.reduce((sum, item) => sum + item.valorGas, 0),
-    totalConsumoGas: cobranca.itens.reduce((sum, item) => sum + item.consumoGas, 0),
+    totalGeral: cobranca.itens.reduce((sum, item) => sum + Number(item.totalAPagar), 0),
+    totalPago: cobranca.itens.reduce((sum, item) => sum + Number(item.valorPago), 0),
+    totalTaxas: cobranca.itens.reduce((sum, item) => sum + Number(item.taxaCondominio), 0),
+    totalExtras: cobranca.itens.reduce((sum, item) => sum + Number(item.taxaExtra), 0),
+    totalGas: cobranca.itens.reduce((sum, item) => sum + Number(item.valorGas), 0),
+    totalConsumoGas: cobranca.itens.reduce((sum, item) => sum + Number(item.consumoGas), 0),
   };
 }
 
@@ -178,8 +178,8 @@ export async function marcarPago(itemId: number, valorPago: number, dataPagament
     valorPago >= item.totalAPagar
       ? "pago"
       : valorPago > 0
-      ? "pago_parcial"
-      : "pendente";
+        ? "pago_parcial"
+        : "pendente";
 
   await prisma.cobrancaItem.update({
     where: { id: itemId },
