@@ -15,7 +15,7 @@ export default async function PrestacaoDetalhePage({ params }: PageProps) {
     notFound();
   }
 
-  return <PrestacaoDetalheClient prestacao={prestacao} />;
+  return <PrestacaoDetalheClient prestacao={prestacao as any} />;
 }
 
 
