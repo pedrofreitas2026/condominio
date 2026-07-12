@@ -32,9 +32,9 @@ export async function getInadimplencias(): Promise<Inadimplente[]> {
     itemId: item.id,
     apartamentoNumero: item.apartamento.numero,
     mesReferencia: item.cobrancaMensal.mesReferencia,
-    totalAPagar: item.totalAPagar,
-    valorPago: item.valorPago,
-    valorEmAberto: item.totalAPagar - item.valorPago,
+    totalAPagar: Number(item.totalAPagar), // Convertido para number
+    valorPago: Number(item.valorPago),     // Convertido para number
+    valorEmAberto: Number(item.totalAPagar) - Number(item.valorPago), // Garante o cálculo seguro
     statusPagamento: item.statusPagamento,
   }));
 }
@@ -47,20 +47,20 @@ export async function registrarPagamentoInadimplencia(
   const item = await prisma.cobrancaItem.findUnique({ where: { id: itemId } });
   if (!item) throw new Error("Item não encontrado");
 
-  const totalPago = item.valorPago + valorPago;
+  const totalPago = Number(item.valorPago) + valorPago;
   const status =
-    totalPago >= item.totalAPagar
+    totalPago >= Number(item.totalAPagar)
       ? "pago"
       : totalPago > 0
-      ? "pago_parcial"
-      : "pendente";
+        ? "pago_parcial"
+        : "pendente";
 
   await prisma.cobrancaItem.update({
     where: { id: itemId },
     data: {
       valorPago: totalPago,
       statusPagamento: status,
-      dataPagamento,
+      dataPagamento: dataPagamento ? new Date(dataPagamento) : null,
     },
   });
 
