@@ -83,16 +83,6 @@ export default function RelatoriosClient({
   const selectedCobranca = cobrancas.find((c) => c.id === selectedId);
   const selectedPrestacao = prestacoes.find((p) => p.id === selectedId);
 
-  const formatCurrency = (value: number | string | null | undefined) => {
-    const amount = Number(value ?? 0);
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Number.isFinite(amount) ? amount : 0);
-  };
-
   const fmtNum = (value: number | string | null | undefined) => {
     const amount = Number(value ?? 0);
     return (Number.isFinite(amount) ? amount : 0).toLocaleString("pt-BR", {
@@ -101,7 +91,15 @@ export default function RelatoriosClient({
     });
   };
 
-  // Tratamentos aritméticos preventivos para a prestação de contas
+  const formatCurrency = (value: number | string | null | undefined) => {
+    const amount = Number(value ?? 0);
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(Number.isFinite(amount) ? amount : 0);
+  };
+
+  // Cálculos internos da Prestação de Contas (Evitando concatenações de string)
   const saldoAnterior = selectedPrestacao ? parseFloat(String(selectedPrestacao.saldoMesAnterior || 0)) : 0;
   const tReceitas = selectedPrestacao ? parseFloat(String(selectedPrestacao.totalReceitas || 0)) : 0;
   const tDespesas = selectedPrestacao ? parseFloat(String(selectedPrestacao.totalDespesas || 0)) : 0;
@@ -119,7 +117,8 @@ export default function RelatoriosClient({
 
   return (
     <div className="fade-in text-black">
-      {/* ============ CABEÇALHO DA TELA (NÃO IMPRIME) ============ */}
+
+      {/* ============ CABEÇALHO DO PAINEL (NÃO IMPRIME) ============ */}
       <div className="flex items-center justify-between mb-8 no-print">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Relatórios</h1>
@@ -135,7 +134,7 @@ export default function RelatoriosClient({
         )}
       </div>
 
-      {/* CONTROLES DE FILTRO (NÃO IMPRIME) */}
+      {/* CONTROLES DO FILTRO DE SELEÇÃO (NÃO IMPRIME) */}
       <div className="glass-card rounded-2xl p-5 mb-6 no-print text-white">
         <div className="flex flex-wrap gap-4 items-end">
           <div>
@@ -177,20 +176,141 @@ export default function RelatoriosClient({
         </div>
       </div>
 
-      {/* ============ LAYOUT 1: IMPRESSÃO DE COBRANÇA MENSAL ============ */}
+      {/* ============ VISUALIZAÇÃO EM TELA / PREVIEW (MANTIDA ORIGINAL) ============ */}
+      <div className="no-print">
+        {tipo === "cobranca" && selectedCobranca && (
+          <div className="glass-card rounded-2xl p-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
+              <h3 className="text-lg text-text-secondary mt-1">
+                TAXA — {formatMesReferencia(selectedCobranca.mesReferencia)}
+              </h3>
+              <p className="text-sm text-text-muted mt-1">
+                Vencimento: {formatDate(selectedCobranca.dataVencimento)}
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Apto</th>
+                    <th className="text-right">Taxa Cond.</th>
+                    <th className="text-right">Taxa Extra</th>
+                    <th className="text-right">Leit. Ant.</th>
+                    <th className="text-right">Leit. Atual</th>
+                    <th className="text-right">Consumo</th>
+                    <th className="text-right">Preço m³</th>
+                    <th className="text-right">Valor Gás</th>
+                    <th className="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedCobranca.itens.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-semibold">{item.apartamento.numero}</td>
+                      <td className="text-right">{formatCurrency(item.taxaCondominio)}</td>
+                      <td className="text-right">{formatCurrency(item.taxaExtra)}</td>
+                      <td className="text-right">{item.leituraAnteriorGas}</td>
+                      <td className="text-right">{item.leituraAtualGas}</td>
+                      <td className="text-right">{item.consumoGas}</td>
+                      <td className="text-right">{formatCurrency(item.precoGasM3)}</td>
+                      <td className="text-right">{formatCurrency(item.valorGas)}</td>
+                      <td className="text-right font-semibold">{formatCurrency(item.totalAPagar)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="font-bold">Totais</td>
+                    <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalTaxas)}</td>
+                    <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalExtras)}</td>
+                    <td></td>
+                    <td></td>
+                    <td className="text-right font-bold">{selectedCobranca.totalConsumoGas}</td>
+                    <td></td>
+                    <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalGas)}</td>
+                    <td className="text-right font-bold text-primary-300">{formatCurrency(selectedCobranca.totalGeral)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tipo === "prestacao" && selectedPrestacao && (
+          <div className="glass-card rounded-2xl p-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
+              <h3 className="text-lg text-text-secondary mt-1">
+                Prestação de Contas — {formatMesReferencia(selectedPrestacao.mesReferencia)}
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-bold text-emerald-400 mb-3">Receitas</h4>
+                <table className="data-table">
+                  <tbody>
+                    {selectedPrestacao.receitas.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.descricao}</td>
+                        <td className="text-right text-emerald-400">{formatCurrency(r.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="font-bold">Total Receitas</td>
+                      <td className="text-right text-emerald-400 font-bold">{formatCurrency(selectedPrestacao.totalReceitas)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div>
+                <h4 className="font-bold text-red-400 mb-3">Despesas</h4>
+                <table className="data-table">
+                  <tbody>
+                    {selectedPrestacao.despesas.map((d) => (
+                      <tr key={d.id}>
+                        <td>{d.descricao}</td>
+                        <td className="text-right text-red-400">{formatCurrency(d.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="font-bold">Total Despesas</td>
+                      <td className="text-right text-red-400 font-bold">{formatCurrency(selectedPrestacao.totalDespesas)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+            <div className="mt-6 p-4 bg-surface rounded-xl border border-border text-center">
+              <p className="text-text-secondary mb-1">Crédito/Déficit do Mês</p>
+              <p className={`text-2xl font-bold ${creditoMesCalculado >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {formatCurrency(creditoMesCalculado)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ============ ESTRUTURAS DE IMPRESSÃO COMPLETA (EXCLUSIVO PARA @MEDIA PRINT) ============ */}
+
+      {/* 1. IMPRESSÃO INTEGRAL DA COBRANÇA (IGUAL À PÁGINA DE DETALHES) */}
       {tipo === "cobranca" && selectedCobranca && (
-        <div className="report-print-container class-cobranca-print bg-white p-6 border border-black">
+        <div className="print-only-container class-cobranca-print bg-white p-4 border border-black">
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold uppercase tracking-wider">Condomínio José Marcolini</h2>
             <h3 className="text-base font-semibold text-gray-700 mt-1 uppercase underline">
-              RELATÓRIO DE TAXAS — {formatMesReferencia(selectedCobranca.mesReferencia)}
+              RELATÓRIO DE TAXAS MENSAL — {formatMesReferencia(selectedCobranca.mesReferencia)}
             </h3>
             <p className="text-xs text-gray-600 mt-1 font-mono">
-              Vencimento original: {formatDate(selectedCobranca.dataVencimento)}
+              Vencimento: {formatDate(selectedCobranca.dataVencimento)}
             </p>
           </div>
 
-          <table className="w-full text-xs border-collapse border border-black text-black bg-white">
+          <table className="w-full text-[10px] border-collapse border border-black text-black bg-white">
             <thead>
               <tr className="bg-gray-100 font-bold">
                 <th className="border border-black p-2 text-center">APTO</th>
@@ -236,9 +356,9 @@ export default function RelatoriosClient({
         </div>
       )}
 
-      {/* ============ LAYOUT 2: IMPRESSÃO DE PRESTAÇÃO DE CONTAS (EXCEL FIEL) ============ */}
+      {/* 2. IMPRESSÃO INTEGRAL DA PRESTAÇÃO (MÉTODO PLANILHA EXCEL FIEL DA IMAGEM) */}
       {tipo === "prestacao" && selectedPrestacao && (
-        <div className="report-print-container class-prestacao-print bg-white p-2">
+        <div className="print-only-container class-prestacao-print bg-white p-2">
 
           <div className="text-center mb-4">
             <h1 className="text-base font-bold tracking-widest uppercase">PRESTAÇÃO DE CONTAS</h1>
@@ -409,7 +529,7 @@ export default function RelatoriosClient({
         </div>
       )}
 
-      {/* TELA DE ESPERA / NENHUM RELATÓRIO SELECIONADO (NÃO IMPRIME) */}
+      {/* NENHUM PERÍODO SELECIONADO (NÃO IMPRIME) */}
       {!selectedId && (
         <div className="glass-card rounded-2xl p-12 text-center no-print">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-text-muted">
@@ -419,11 +539,26 @@ export default function RelatoriosClient({
         </div>
       )}
 
-      {/* ============ FOLHA DE ESTILOS CSS PARA IMPRESSÃO COMPATÍVEL ============ */}
+      {/* ============ DIRETIVAS CSS DE MEDIA PRINT MÚLTIPLAS ============ */}
       <style jsx global>{`
+        /* Esconde os containers estruturais de impressão na tela */
+        .print-only-container {
+          display: none;
+        }
+
         @media print {
+          /* Desativa elementos de tela e controles */
           .no-print, .screen-only { 
             display: none !important; 
+          }
+          /* Ativa o container de folha física */
+          .print-only-container { 
+            display: block !important; 
+            width: 100% !important;
+            max-width: 790px !important;
+            margin: 0 auto !important;
+            background: white !important;
+            color: black !important;
           }
           body { 
             background: white !important; 
@@ -431,17 +566,7 @@ export default function RelatoriosClient({
             padding: 0 !important; 
             margin: 0 !important; 
           }
-          .glass-card {
-            border: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-          }
-          .report-print-container {
-            display: block !important;
-            width: 100% !important;
-            max-width: 790px !important;
-            margin: 0 auto !important;
-          }
+          /* Força injeção de cores do Excel (Cinza e Amarelos) */
           * { 
             -webkit-print-color-adjust: exact !important; 
             print-color-adjust: exact !important; 
