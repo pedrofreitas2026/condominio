@@ -79,22 +79,17 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
   const [editMov, setEditMov] = useState<Movimentacao | null>(null);
   const [editAtraso, setEditAtraso] = useState<Atraso | null>(null);
 
-  // Garantindo que as operações matemáticas usem números puros
-  const saldoAnterior = parseFloat(String(prestacao.saldoMesAnterior || 0));
-  const totalReceitas = parseFloat(String(prestacao.totalReceitas || 0));
-  const totalDespesas = parseFloat(String(prestacao.totalDespesas || 0));
+  // Correção profunda do reduce para evitar concatenações de string no totalizador
+  const totalAtrasos = prestacao.atrasos?.reduce((sum, a) => {
+    const valorItem = parseFloat(String(a.valor || 0));
+    const acumuladorParcial = parseFloat(String(sum));
+    return acumuladorParcial + valorItem;
+  }, 0) ?? 0;
 
-  const totalAtrasos = prestacao.atrasos?.reduce((sum, a) => sum + parseFloat(String(a.valor || 0)), 0) ?? 0;
-  const totalReceitasPlanilha = saldoAnterior + totalReceitas;
-  const creditoMesCalculado = totalReceitasPlanilha - totalDespesas;
-
-  const movGas = prestacao.movimentacoes?.filter(m => m.conta === "reserva_gas") || [];
-  const movCC = prestacao.movimentacoes?.filter(m => m.conta === "conta_corrente") || [];
-  const movPoupança = prestacao.movimentacoes?.filter(m => m.conta === "poupanca") || [];
-
-  const saldoFinalGas = movGas.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(prestacao.saldoReservaGas || 0)));
-  const saldoFinalCC = movCC.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(prestacao.saldoContaCorrente || 0)));
-  const saldoFinalPoupanca = movPoupança.reduce((sum, m) => sum + (m.tipo === "entrada" ? parseFloat(String(m.valor)) : -parseFloat(String(m.valor))), parseFloat(String(prestacao.saldoPoupanca || 0)));
+  const saldoAcumulado = [
+    prestacao.saldoContaCorrente,
+    prestacao.saldoPoupanca,
+  ].reduce((total, saldo) => total + parseFloat(String(saldo ?? 0)), 0);
 
   const formatCurrency = (value: number | string | null | undefined) => {
     const amount = Number(value ?? 0);
@@ -130,10 +125,61 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     });
   };
 
+  const handleDeleteReceita = (id: number) => {
+    if (!confirm("Remover esta receita?")) return;
+    startTransition(async () => {
+      await deleteReceita(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const handleDeleteDespesa = (id: number) => {
+    if (!confirm("Remover esta despesa?")) return;
+    startTransition(async () => {
+      await deleteDespesa(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const handleEditReceita = async (formData: FormData) => {
+    if (!editReceita) return;
+    startTransition(async () => {
+      await updateReceita(editReceita.id, prestacao.id, formData);
+      setEditReceita(null);
+      router.refresh();
+    });
+  };
+
+  const handleEditDespesa = async (formData: FormData) => {
+    if (!editDespesa) return;
+    startTransition(async () => {
+      await updateDespesa(editDespesa.id, prestacao.id, formData);
+      setEditDespesa(null);
+      router.refresh();
+    });
+  };
+
   const handleAddMov = async (formData: FormData) => {
     startTransition(async () => {
       await addMovimentacao(prestacao.id, formData);
       setShowMovForm(false);
+      router.refresh();
+    });
+  };
+
+  const handleDeleteMov = (id: number) => {
+    if (!confirm("Remover esta movimentação?")) return;
+    startTransition(async () => {
+      await deleteMovimentacao(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
+  const handleEditMov = async (formData: FormData) => {
+    if (!editMov) return;
+    startTransition(async () => {
+      await updateMovimentacao(editMov.id, prestacao.id, formData);
+      setEditMov(null);
       router.refresh();
     });
   };
@@ -146,6 +192,23 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
     });
   };
 
+  const handleEditAtraso = async (formData: FormData) => {
+    if (!editAtraso) return;
+    startTransition(async () => {
+      await updateAtraso(editAtraso.id, prestacao.id, formData);
+      setEditAtraso(null);
+      router.refresh();
+    });
+  };
+
+  const handleDeleteAtraso = (id: number) => {
+    if (!confirm("Remover este atraso?")) return;
+    startTransition(async () => {
+      await deleteAtraso(id, prestacao.id);
+      router.refresh();
+    });
+  };
+
   const contaLabel: Record<string, string> = {
     reserva_gas: "Reserva p/ Gás",
     conta_corrente: "Conta Corrente",
@@ -154,207 +217,171 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
 
   return (
     <div className="fade-in">
-
-      {/* ============ PRINT LAYOUT (ESTILO FIEL EXCEL) ============ */}
-      <div className="print-layout-excel">
-
-        {/* Título da Planilha */}
-        <div style={{ textHeading: "center", width: "100%", textAlign: "center", marginBottom: "15px" }}>
-          <div style={{ fontSize: "14pt", fontWeight: "bold", letterSpacing: "1px" }}>PRESTAÇÃO DE CONTAS</div>
-          <table style={{ margin: "10px auto 0 auto", borderCollapse: "collapse", border: "1px solid black", fontSize: "10pt" }}>
-            <tbody>
-              <tr>
-                <td style={{ border: "1px solid black", padding: "3px 15px", fontWeight: "bold", background: "#f2f2f2" }}>MÊS:</td>
-                <td style={{ border: "1px solid black", padding: "3px 30px", fontWeight: "bold", textTransform: "uppercase" }}>{formatMesReferencia(prestacao.mesReferencia)}</td>
-              </tr>
-            </tbody>
-          </table>
+      {/* ============ PRINT LAYOUT ============ */}
+      <div className="print-layout">
+        <div style={{ textAlign: "center", marginBottom: "15px" }}>
+          <h1 style={{ fontSize: "16pt", fontWeight: "bold", margin: "0", border: "2px solid #333", padding: "8px", background: "#f0f0f0" }}>
+            {prestacao.condominio.nome.toUpperCase()}
+          </h1>
+          <h2 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0", border: "2px solid #000", borderTop: "none", padding: "6px" }}>
+            DEMONSTRATIVO DE PRESTAÇÃO DE CONTAS — MÊS: {formatMesReferencia(prestacao.mesReferencia).toUpperCase()}
+          </h2>
         </div>
 
-        {/* Grade de Receitas vs Despesas */}
-        <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid black", fontSize: "9pt", backgroundColor: "white" }}>
-          <thead>
-            {/* Bloco de Título de Seção */}
-            <tr style={{ fontWeight: "bold", textAlign: "center" }}>
-              <th colSpan={2} style={{ border: "1px solid black", padding: "4px", background: "#ffffff" }}>Receitas</th>
-              <th colSpan={2} style={{ border: "1px solid black", padding: "4px", background: "#ffffff" }}>DESPESAS</th>
-            </tr>
-            {/* Cabeçalhos das Colunas */}
-            <tr style={{ fontWeight: "bold", background: "#ffffff" }}>
-              <th style={{ border: "1px solid black", padding: "4px", textAlign: "left", width: "35%" }}>DESCRIMINAÇÃO</th>
-              <th style={{ border: "1px solid black", padding: "4px", textAlign: "right", width: "15%" }}>Valor</th>
-              <th style={{ border: "1px solid black", padding: "4px", textAlign: "left", width: "35%" }}>DESCRIMINAÇÃO</th>
-              <th style={{ border: "1px solid black", padding: "4px", textAlign: "right", width: "15%" }}>Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Linha do Saldo Anterior fixo à esquerda combinando com a primeira despesa */}
-            <tr>
-              <td style={{ border: "1px solid black", padding: "3px 6px" }}>SALDO MÊS ANTERIOR</td>
-              <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>R$ {fmtNum(saldoAnterior)}</td>
-              <td style={{ border: "1px solid black", padding: "3px 6px" }}>{prestacao.despesas[0]?.descricao.toUpperCase() || ""}</td>
-              <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>{prestacao.despesas[0] ? `R$ ${fmtNum(prestacao.despesas[0].valor)}` : ""}</td>
-            </tr>
-
-            {/* Loop Misto para renderizar as linhas paralelas perfeitamente integradas */}
-            {Array.from({ length: Math.max(10, prestacao.receitas.length, prestacao.despesas.length - 1) }).map((_, index) => {
-              const rItem = prestacao.receitas[index];
-              const dItem = prestacao.despesas[index + 1]; // +1 porque a primeira já foi listada acima
-
-              return (
-                <tr key={index}>
-                  {/* Células de Receita */}
-                  <td style={{ border: "1px solid black", padding: "3px 6px" }}>{rItem?.descricao.toUpperCase() || ""}</td>
-                  <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>{rItem ? `R$ ${fmtNum(rItem.valor)}` : ""}</td>
-
-                  {/* Células de Despesa */}
-                  <td style={{ border: "1px solid black", padding: "3px 6px" }}>{dItem?.descricao.toUpperCase() || ""}</td>
-                  <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "right" }}>{dItem ? `R$ ${fmtNum(dItem.valor)}` : ""}</td>
-                </tr>
-              );
-            })}
-
-            {/* Bloco de Condomínios em Atraso Amarelo incorporado na tabela de receitas */}
-            <tr style={{ background: "#ffff00", fontWeight: "bold" }}>
-              <td colSpan={2} style={{ border: "1px solid black", padding: "4px 6px" }}>CONDOMÍNIOS EM ATRASO</td>
-              <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-              <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-            </tr>
-
-            {/* Inserção dinâmica dos atrasos com formato de célula dupla como a planilha */}
-            {Array.from({ length: Math.max(3, prestacao.atrasos?.length || 0) }).map((_, index) => {
-              const aItem = prestacao.atrasos?.[index];
-              return (
-                <tr key={`atraso-${index}`}>
-                  <td style={{ border: "1px solid black", padding: "3px 6px", textTransform: "uppercase" }}>{aItem?.mesReferencia || ""}</td>
-                  <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "left" }}>{aItem ? `R$ ${fmtNum(aItem.valor)}` : ""}</td>
-                  <td style={{ border: "1px solid black" }}></td>
-                  <td style={{ border: "1px solid black" }}></td>
-                </tr>
-              );
-            })}
-
-            {/* Totalizador de Atrasos Amarelo */}
-            <tr style={{ background: "#ffff99", fontWeight: "bold" }}>
-              <td style={{ border: "1px solid black", padding: "3px 6px" }}>TOTAL</td>
-              <td style={{ border: "1px solid black", padding: "3px 6px", textAlign: "left" }}>R$ {fmtNum(totalAtrasos)}</td>
-              <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-              <td style={{ border: "1px solid black", background: "#ffffff" }}></td>
-            </tr>
-
-            {/* Linhas vazias estruturais de fechamento antes do total geral */}
-            <tr style={{ height: "15px" }}><td style={{ border: "1px solid black" }}></td><td style={{ border: "1px solid black" }}></td><td style={{ border: "1px solid black" }}></td><td style={{ border: "1px solid black" }}></td></tr>
-
-            {/* Rodapé de Totais Gerais da Planilha Superior */}
-            <tr style={{ fontWeight: "bold" }}>
-              <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "center" }}>TOTAL</td>
-              <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "right" }}>R$ {fmtNum(totalReceitasPlanilha)}</td>
-              <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "center" }}>TOTAL</td>
-              <td style={{ border: "1px solid black", padding: "4px 6px", textAlign: "right" }}>R$ {fmtNum(totalDespesas)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Bloco de Destaque: Crédito do Mês */}
-        <div style={{ display: "flex", justifyContent: "center", margin: "15px 0" }}>
-          <table style={{ borderCollapse: "collapse", border: "1px solid black", fontWeight: "bold", fontSize: "10pt" }}>
-            <tbody>
-              <tr style={{ background: "#ffff00" }}>
-                <td style={{ border: "1px solid black", padding: "4px 20px", uppercase: "true" }}>CRÉDITO DO MÊS</td>
-                <td style={{ border: "1px solid black", padding: "4px 25px", textAlign: "right" }}>
-                  {creditoMesCalculado >= 0 ? "" : "-"}R$ {fmtNum(Math.abs(creditoMesCalculado))}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Rodapé de Contas e Movimentações Financeiras Triplas */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0px", border: "1px solid black", backgroundColor: "white", fontSize: "8pt" }}>
-
-          {/* Conta 1: Reserva para o Gás */}
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "between", borderRight: "1px solid black" }}>
-            <div style={{ background: "#d9d9d9", textAlign: "center", fontWeight: "bold", borderBottom: "1px solid black", padding: "3px" }}>RESERVA PARA O GÁS</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid black" }}>
-                  <td style={{ padding: "3px 5px", borderRight: "1px solid black" }}>SALDO</td>
-                  <td style={{ padding: "3px 5px", textAlign: "right" }}>R$ {fmtNum(prestacao.saldoReservaGas)}</td>
-                </tr>
-                {movGas.map((m) => (
-                  <tr key={m.id} style={{ borderBottom: "1px solid black" }}>
-                    <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{m.descricao}</td>
-                    <td style={{ padding: "3px 5px", textAlign: "right" }}>{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</td>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px", alignItems: "start" }}>
+          {/* Column 1: Receitas & Resumo */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RECEITAS
+              </h3>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th className="print-th" style={{ textAlign: "left" }}>DESCRIÇÃO</th>
+                    <th className="print-th" style={{ textAlign: "right", width: "90px" }}>VALOR</th>
                   </tr>
-                ))}
-                {Array.from({ length: Math.max(0, 3 - movGas.length) }).map((_, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid black", height: "16px" }}><td style={{ borderRight: "1px solid black" }}></td><td></td></tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ borderTop: "1px solid black", padding: "3px 5px", fontWeight: "bold", display: "flex", justifyContent: "space-between", fontSize: "9pt", background: "#ffffff" }}>
-              <span style={{ textTransform: "uppercase" }}>{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</span>
-              <span>R$ {fmtNum(saldoFinalGas)}</span>
+                </thead>
+                <tbody>
+                  {prestacao.receitas.map((r) => (
+                    <tr key={r.id}>
+                      <td className="print-td">{r.descricao}</td>
+                      <td className="print-td print-td-right">R$ {fmtNum(r.valor)}</td>
+                    </tr>
+                  ))}
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">TOTAL RECEITAS</td>
+                    <td className="print-td print-td-right print-td-bold">R$ {fmtNum(prestacao.totalReceitas)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RESUMO FINANCEIRO DO MÊS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">(+) Receitas do Mês</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalReceitas)}</td>
+                  </tr>
+                  <tr>
+                    <td className="print-td">(-) Despesas do Mês</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalDespesas)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">(=) CRÉDITO DO MÊS</td>
+                    <td className="print-td print-td-right print-td-bold" style={{ color: (prestacao.totalReceitas - prestacao.totalDespesas) >= 0 ? "green" : "red" }}>
+                      R$ {fmtNum(prestacao.totalReceitas - prestacao.totalDespesas)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Conta 2: Conta Corrente */}
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "between", borderRight: "1px solid black" }}>
-            <div style={{ background: "#d9d9d9", textAlign: "center", fontWeight: "bold", borderBottom: "1px solid black", padding: "3px" }}>CONTA CORRENTE</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid black" }}>
-                  <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</td>
-                  <td style={{ padding: "3px 5px", textAlign: "right" }}>R$ {fmtNum(prestacao.saldoContaCorrente)}</td>
+          {/* Column 2: Despesas */}
+          <div>
+            <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+              DESPESAS
+            </h3>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th className="print-th" style={{ textAlign: "left" }}>DESCRIÇÃO</th>
+                  <th className="print-th" style={{ textAlign: "right", width: "90px" }}>VALOR</th>
                 </tr>
-                {movCC.map((m) => (
-                  <tr key={m.id} style={{ borderBottom: "1px solid black" }}>
-                    <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{m.descricao}</td>
-                    <td style={{ padding: "3px 5px", textAlign: "right" }}>{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</td>
+              </thead>
+              <tbody>
+                {prestacao.despesas.map((d) => (
+                  <tr key={d.id}>
+                    <td className="print-td">
+                      {d.descricao}
+                      {d.categoria && <span style={{ fontSize: "7px", border: "1px solid #999", padding: "1px 2px", borderRadius: "3px", marginLeft: "4px", textTransform: "uppercase" }}>{d.categoria}</span>}
+                    </td>
+                    <td className="print-td print-td-right">R$ {fmtNum(d.valor)}</td>
                   </tr>
                 ))}
-                {Array.from({ length: Math.max(0, 3 - movCC.length) }).map((_, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid black", height: "16px" }}><td style={{ borderRight: "1px solid black" }}></td><td></td></tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ borderTop: "1px solid black", padding: "3px 5px", fontWeight: "bold", display: "flex", justifyContent: "space-between", fontSize: "9pt", background: "#ffffff" }}>
-              <span style={{ textTransform: "uppercase" }}>{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</span>
-              <span>R$ {fmtNum(saldoFinalCC)}</span>
-            </div>
-          </div>
-
-          {/* Conta 3: Conta Poupança */}
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "between" }}>
-            <div style={{ background: "#d9d9d9", textAlign: "center", fontWeight: "bold", borderBottom: "1px solid black", padding: "3px" }}>CONTA POUPANÇA</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid black" }}>
-                  <td style={{ padding: "3px 5px", borderRight: "1px solid black" }}>MÊS ANTERIOR</td>
-                  <td style={{ padding: "3px 5px", textAlign: "right" }}>R$ {fmtNum(prestacao.saldoPoupanca)}</td>
+                <tr className="print-totais">
+                  <td className="print-td print-td-bold">TOTAL DESPESAS</td>
+                  <td className="print-td print-td-right print-td-bold">R$ {fmtNum(prestacao.totalDespesas)}</td>
                 </tr>
-                {movPoupança.map((m) => (
-                  <tr key={m.id} style={{ borderBottom: "1px solid black" }}>
-                    <td style={{ padding: "3px 5px", borderRight: "1px solid black", textTransform: "uppercase" }}>{m.descricao}</td>
-                    <td style={{ padding: "3px 5px", textAlign: "right" }}>{m.tipo === "saida" ? "-" : ""}R$ {fmtNum(m.valor)}</td>
-                  </tr>
-                ))}
-                {Array.from({ length: Math.max(0, 3 - movPoupança.length) }).map((_, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid black", height: "16px" }}><td style={{ borderRight: "1px solid black" }}></td><td></td></tr>
-                ))}
               </tbody>
             </table>
-            <div style={{ borderTop: "1px solid black", padding: "3px 5px", fontWeight: "bold", display: "flex", justifyContent: "space-between", fontSize: "9pt", background: "#ffffff" }}>
-              <span style={{ textTransform: "uppercase" }}>{formatMesReferencia(prestacao.mesReferencia).split(" ")[0]}</span>
-              <span style={{ fontWeight: "bold" }}>R$ {fmtNum(saldoFinalPoupanca)}</span>
-            </div>
           </div>
 
+          {/* Column 3: Saldos & Atrasos */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RESERVA GÁS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">Reserva para Gás</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.saldoReservaGas)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">TOTAL RESERVA GÁS</td>
+                    <td className="print-td print-td-right print-td-bold">
+                      R$ {fmtNum(prestacao.saldoReservaGas)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                SALDOS DAS CONTAS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">Conta Corrente</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.saldoContaCorrente)}</td>
+                  </tr>
+                  <tr>
+                    <td className="print-td">Poupança</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.saldoPoupanca)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">SALDO ACUMULADO</td>
+                    <td className="print-td print-td-right print-td-bold">
+                      R$ {fmtNum(saldoAcumulado)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {prestacao.atrasos && prestacao.atrasos.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                  CONDOMÍNIOS EM ATRASO
+                </h3>
+                <table className="print-table">
+                  <tbody>
+                    {prestacao.atrasos.map((item) => (
+                      <tr key={item.id}>
+                        <td className="print-td" style={{ textTransform: "uppercase" }}>{item.mesReferencia}</td>
+                        <td className="print-td print-td-right">R$ {fmtNum(item.valor)}</td>
+                      </tr>
+                    ))}
+                    <tr className="print-totais">
+                      <td className="print-td print-td-bold">TOTAL</td>
+                      <td className="print-td print-td-right print-td-bold">R$ {fmtNum(totalAtrasos)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-
       </div>
 
-      {/* ============ SCREEN LAYOUT (MANTIDO INALTERADO) ============ */}
+      {/* ============ SCREEN LAYOUT ============ */}
       <div className="screen-only">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -368,6 +395,7 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
               {formatMesReferencia(prestacao.mesReferencia)}
             </h1>
           </div>
+          {/* Atualização pontual do botão de impressão mantendo o restante estático */}
           <div className="flex gap-2 items-center no-print">
             <button
               onClick={() => window.print()}
@@ -538,7 +566,117 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
           </div>
         </div>
 
-        {/* Lançamentos Rápidos Inferiores de Movimentação */}
+        {/* Edit Receita Modal */}
+        {editReceita && (
+          <div className="modal-overlay no-print" onClick={() => setEditReceita(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Receita</h2>
+              <form action={handleEditReceita} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Descrição *</label>
+                  <input name="descricao" required className="input-field" defaultValue={editReceita.descricao} />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                  <input name="valor" type="number" required step="0.01" className="input-field" defaultValue={editReceita.valor} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditReceita(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Despesa Modal */}
+        {editDespesa && (
+          <div className="modal-overlay no-print" onClick={() => setEditDespesa(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Despesa</h2>
+              <form action={handleEditDespesa} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Descrição *</label>
+                  <input name="descricao" required className="input-field" defaultValue={editDespesa.descricao} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                    <input name="valor" type="number" required step="0.01" className="input-field" defaultValue={editDespesa.valor} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Categoria</label>
+                    <select name="categoria" className="input-field" defaultValue={editDespesa.categoria || ""}>
+                      <option value="">Nenhuma</option>
+                      <option value="energia">Energia</option>
+                      <option value="agua">Água</option>
+                      <option value="servico">Serviço</option>
+                      <option value="banco">Banco</option>
+                      <option value="manutencao">Manutenção</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Data do Pagamento</label>
+                  <input name="dataPagamento" type="date" className="input-field" defaultValue={editDespesa.dataPagamento || ""} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditDespesa(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Movimentação Modal */}
+        {editMov && (
+          <div className="modal-overlay no-print" onClick={() => setEditMov(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Movimentação</h2>
+              <form action={handleEditMov} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Conta *</label>
+                    <select name="conta" required className="input-field" defaultValue={editMov.conta}>
+                      <option value="reserva_gas">Reserva p/ Gás</option>
+                      <option value="conta_corrente">Conta Corrente</option>
+                      <option value="poupanca">Poupança</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">Tipo *</label>
+                    <select name="tipo" required className="input-field" defaultValue={editMov.tipo}>
+                      <option value="entrada">Entrada</option>
+                      <option value="saida">Saída</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                  <input name="valor" type="number" required step="0.01" min="0" className="input-field" defaultValue={editMov.valor} />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Descrição *</label>
+                  <input name="descricao" required className="input-field" defaultValue={editMov.descricao} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditMov(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Account Balances */}
         <div className="glass-card rounded-2xl p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="section-title mb-0">Saldos das Contas</h2>
@@ -585,6 +723,47 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
               <p className="text-xl font-bold text-purple-400">{formatCurrency(prestacao.saldoPoupanca)}</p>
             </div>
           </div>
+
+          {/* Movimentações list */}
+          {prestacao.movimentacoes.length > 0 && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Conta</th>
+                  <th>Descrição</th>
+                  <th>Tipo</th>
+                  <th className="text-right">Valor</th>
+                  <th className="text-center no-print">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prestacao.movimentacoes.map((m) => (
+                  <tr key={m.id}>
+                    <td>{contaLabel[m.conta] || m.conta}</td>
+                    <td>{m.descricao}</td>
+                    <td>
+                      <span className={`badge ${m.tipo === "entrada" ? "badge-success" : "badge-danger"}`}>
+                        {m.tipo}
+                      </span>
+                    </td>
+                    <td className={`text-right ${m.tipo === "entrada" ? "text-emerald-400" : "text-red-400"}`}>
+                      {formatCurrency(m.valor)}
+                    </td>
+                    <td className="text-center no-print">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => setEditMov(m)} className="text-primary-400 hover:text-primary-300 text-xs" title="Editar">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteMov(m.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Condomínios em Atraso */}
@@ -641,65 +820,50 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
                 </tr>
               )}
             </tbody>
+            {prestacao.atrasos && prestacao.atrasos.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td className="font-bold">Total</td>
+                  <td className="text-right text-red-400 font-bold">{formatCurrency(totalAtrasos)}</td>
+                  <td className="no-print"></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
+
+        {/* Edit Atraso Modal */}
+        {editAtraso && (
+          <div className="modal-overlay no-print" onClick={() => setEditAtraso(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Editar Atraso</h2>
+              <form action={handleEditAtraso} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Mês de Referência *</label>
+                  <input name="mesReferencia" required className="input-field" defaultValue={editAtraso.mesReferencia} />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Valor (R$) *</label>
+                  <input name="valor" type="number" required step="0.01" className="input-field" defaultValue={editAtraso.valor} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button type="button" onClick={() => setEditAtraso(null)} className="btn-secondary">Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={isPending}>
+                    {isPending ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* MODAL GLOBAL PARA EDICÃO DE REPOSITÓRIO */}
-      {editAtraso && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center no-print p-4 z-50">
-          <div className="bg-white border border-black p-4 w-full max-w-sm">
-            <h3 className="font-bold text-sm mb-2 uppercase">Editar Item em Atraso</h3>
-            <form action={handleEditAtraso} className="space-y-2 text-xs">
-              <input name="mesReferencia" required className="w-full border p-1 uppercase" defaultValue={editAtraso.mesReferencia} />
-              <input name="valor" type="number" required step="0.01" className="w-full border p-1" defaultValue={editAtraso.valor} />
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" onClick={() => setEditAtraso(null)} className="border px-2 py-1">Cancelar</button>
-                <button type="submit" className="bg-black text-white px-2 py-1">Salvar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ============ ESTILIZAÇÃO CSS DE CONTROLE DA IMPRESSÃO FIEL ============ */}
+      {/* Força o renderizador do Chrome/Firefox a manter os backgrounds cinza e amarelo na folha física */}
       <style jsx global>{`
-        /* Por padrão oculta o layout de planilha na tela */
-        .print-layout-excel {
-          display: none;
-        }
-
         @media print {
-          /* Inverte a visibilidade dos blocos */
-          .screen-only, .no-print { 
-            display: none !important; 
-          }
-          .print-layout-excel { 
-            display: block !important; 
-            width: 100% !important;
-            max-width: 790px !important;
-            margin: 0 auto !important;
-            background: white !important;
-            color: black !important;
-          }
-          
-          body { 
-            background: white !important; 
-            color: black !important; 
-            padding: 0 !important; 
-            margin: 0 !important; 
-          }
-
-          /* Força o navegador a imprimir as cores de preenchimento (Amarelo e Cinza Excel) */
-          * { 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
-          }
-
-          /* Garante que as bordas pretas fiquem visíveis na folha física */
-          table, th, td, div {
-            border-color: #000000 !important;
-          }
+          .no-print { display: none !important; }
+          body { background: white !important; color: black !important; padding: 0 !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
     </div>
