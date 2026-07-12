@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatCurrency, formatMesReferencia, formatDate } from "@/lib/utils";
+import { formatMesReferencia, formatDate } from "@/lib/utils";
 import Link from "next/link";
 
 interface CobrancaItem {
@@ -72,6 +72,15 @@ export default function RelatoriosClient({
 
   const selectedCobranca = cobrancas.find((c) => c.id === selectedId);
   const selectedPrestacao = prestacoes.find((p) => p.id === selectedId);
+
+  const formatCurrency = (value: number | string | null | undefined) => {
+    const amount = Number(value ?? 0);
+
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(Number.isFinite(amount) ? amount : 0);
+  };
 
   // Armazena o cálculo dinâmico da prestação selecionada
   const valorCreditoDeficit = selectedPrestacao
