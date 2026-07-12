@@ -229,7 +229,8 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px", alignItems: "start" }}>
-          {/* Column 1: Receitas & Resumo */}
+
+          {/* Coluna 1: Receitas e Abaixo os Condomínios em Atraso */}
           <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
             <div>
               <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
@@ -257,32 +258,31 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
               </table>
             </div>
 
-            <div>
-              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
-                RESUMO FINANCEIRO DO MÊS
-              </h3>
-              <table className="print-table">
-                <tbody>
-                  <tr>
-                    <td className="print-td">(+) Receitas do Mês</td>
-                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalReceitas)}</td>
-                  </tr>
-                  <tr>
-                    <td className="print-td">(-) Despesas do Mês</td>
-                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalDespesas)}</td>
-                  </tr>
-                  <tr className="print-totais">
-                    <td className="print-td print-td-bold">(=) CRÉDITO DO MÊS</td>
-                    <td className="print-td print-td-right print-td-bold" style={{ color: (prestacao.totalReceitas - prestacao.totalDespesas) >= 0 ? "green" : "red" }}>
-                      R$ {fmtNum(prestacao.totalReceitas - prestacao.totalDespesas)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {/* Condomínios em Atraso reposicionados para debaixo de Receitas */}
+            {prestacao.atrasos && prestacao.atrasos.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                  CONDOMÍNIOS EM ATRASO
+                </h3>
+                <table className="print-table">
+                  <tbody>
+                    {prestacao.atrasos.map((item) => (
+                      <tr key={item.id}>
+                        <td className="print-td" style={{ textTransform: "uppercase" }}>{item.mesReferencia}</td>
+                        <td className="print-td print-td-right">R$ {fmtNum(item.valor)}</td>
+                      </tr>
+                    ))}
+                    <tr className="print-totais">
+                      <td className="print-td print-td-bold">TOTAL</td>
+                      <td className="print-td print-td-right print-td-bold">R$ {fmtNum(totalAtrasos)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          {/* Column 2: Despesas */}
+          {/* Coluna 2: Despesas */}
           <div>
             <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
               DESPESAS
@@ -312,8 +312,32 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
             </table>
           </div>
 
-          {/* Column 3: Saldos & Atrasos */}
+          {/* Coluna 3: Resumo Financeiro, Reserva do Gás e Saldos das Contas agrupados */}
           <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            <div>
+              <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
+                RESUMO FINANCEIRO DO MÊS
+              </h3>
+              <table className="print-table">
+                <tbody>
+                  <tr>
+                    <td className="print-td">(+) Receitas do Mês</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalReceitas)}</td>
+                  </tr>
+                  <tr>
+                    <td className="print-td">(-) Despesas do Mês</td>
+                    <td className="print-td print-td-right">R$ {fmtNum(prestacao.totalDespesas)}</td>
+                  </tr>
+                  <tr className="print-totais">
+                    <td className="print-td print-td-bold">(=) CRÉDITO DO MÊS</td>
+                    <td className="print-td print-td-right print-td-bold" style={{ color: (prestacao.totalReceitas - prestacao.totalDespesas) >= 0 ? "green" : "red" }}>
+                      R$ {fmtNum(prestacao.totalReceitas - prestacao.totalDespesas)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <div>
               <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
                 RESERVA GÁS
@@ -355,29 +379,8 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
                 </tbody>
               </table>
             </div>
-
-            {prestacao.atrasos && prestacao.atrasos.length > 0 && (
-              <div>
-                <h3 style={{ fontSize: "10pt", fontWeight: "bold", margin: "0 0 6px 0", borderBottom: "2px solid #333", paddingBottom: "2px" }}>
-                  CONDOMÍNIOS EM ATRASO
-                </h3>
-                <table className="print-table">
-                  <tbody>
-                    {prestacao.atrasos.map((item) => (
-                      <tr key={item.id}>
-                        <td className="print-td" style={{ textTransform: "uppercase" }}>{item.mesReferencia}</td>
-                        <td className="print-td print-td-right">R$ {fmtNum(item.valor)}</td>
-                      </tr>
-                    ))}
-                    <tr className="print-totais">
-                      <td className="print-td print-td-bold">TOTAL</td>
-                      <td className="print-td print-td-right print-td-bold">R$ {fmtNum(totalAtrasos)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
+
         </div>
       </div>
 
@@ -395,7 +398,6 @@ export default function PrestacaoDetalheClient({ prestacao }: { prestacao: Prest
               {formatMesReferencia(prestacao.mesReferencia)}
             </h1>
           </div>
-          {/* Atualização pontual do botão de impressão mantendo o restante estático */}
           <div className="flex gap-2 items-center no-print">
             <button
               onClick={() => window.print()}
