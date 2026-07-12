@@ -12,11 +12,7 @@ import {
 export async function getCobrancas() {
   const cobrancas = await prisma.cobrancaMensal.findMany({
     where: { condominioId: 1 },
-    include: {
-      itens: {
-        include: { apartamento: true },
-      },
-    },
+    include: { itens: { include: { apartamento: true } } },
     orderBy: { mesReferencia: "desc" },
   });
 
@@ -62,31 +58,26 @@ export async function createCobranca(formData: FormData) {
   const taxaCondominioPadrao = parseFloat(formData.get("taxaCondominioPadrao") as string);
   const taxaExtraPadrao = parseFloat(formData.get("taxaExtraPadrao") as string) || 0;
   const precoGasM3Padrao = parseFloat(formData.get("precoGasM3Padrao") as string);
-  const observacoes = formData.get("observacoes") as string || null;
+  const observacoes = (formData.get("observacoes") as string) || null;
   const copiarAnterior = formData.get("copiarAnterior") === "true";
 
-  // Get active apartments
   const apartamentos = await prisma.apartamento.findMany({
     where: { condominioId: 1, ativo: true },
     orderBy: { numero: "asc" },
   });
 
-  // Get previous month's billing for gas readings
   let previousItens: Record<number, { leituraAtualGas: number }> = {};
   if (copiarAnterior) {
-    // Busca a última cobrança anterior ao mês atual (não apenas o mês imediatamente anterior)
     const prevCobranca = await prisma.cobrancaMensal.findFirst({
-      where: {
-        condominioId: 1,
-        mesReferencia: { lt: mesReferencia },
-      },
+      where: { condominioId: 1, mesReferencia: { lt: mesReferencia } },
       orderBy: { mesReferencia: "desc" },
       include: { itens: true },
     });
+
     if (prevCobranca) {
       for (const item of prevCobranca.itens) {
         previousItens[item.apartamentoId] = {
-          leituraAtualGas: item.leituraAtualGas,
+          leituraAtualGas: Number(item.leituraAtualGas),
         };
       }
     }
@@ -142,12 +133,11 @@ export async function updateCobrancaItem(
 
   if (!item) throw new Error("Item não encontrado");
 
-  const leituraAtual = data.leituraAtualGas ?? item.leituraAtualGas;
-  const taxaCondominio = data.taxaCondominio ?? item.taxaCondominio;
-  const taxaExtra = data.taxaExtra ?? item.taxaExtra;
-
-  const consumo = calcConsumoGas(item.leituraAnteriorGas, leituraAtual);
-  const precoGas = calcPrecoGas(consumo, item.cobrancaMensal.precoGasM3Padrao);
+  const leituraAtual = data.leituraAtualGas ?? Number(item.leituraAtualGas);
+  const taxaCondominio = data.taxaCondominio ?? Number(item.taxaCondominio);
+  const taxaExtra = data.taxaExtra ?? Number(item.taxaExtra);
+  const consumo = calcConsumoGas(Number(item.leituraAnteriorGas), leituraAtual);
+  const precoGas = calcPrecoGas(consumo, Number(item.cobrancaMensal.precoGasM3Padrao));
   const valorGas = calcValorGas(consumo, precoGas);
   const total = calcTotalAPagar(taxaCondominio, taxaExtra, valorGas);
 
@@ -175,7 +165,7 @@ export async function marcarPago(itemId: number, valorPago: number, dataPagament
   if (!item) throw new Error("Item não encontrado");
 
   const status =
-    valorPago >= item.totalAPagar
+    valorPago >= Number(item.totalAPagar)
       ? "pago"
       : valorPago > 0
         ? "pago_parcial"
@@ -183,11 +173,7 @@ export async function marcarPago(itemId: number, valorPago: number, dataPagament
 
   await prisma.cobrancaItem.update({
     where: { id: itemId },
-    data: {
-      valorPago,
-      dataPagamento,
-      statusPagamento: status,
-    },
+    data: { valorPago, dataPagamento, statusPagamento: status },
   });
 
   revalidatePath("/cobrancas", "layout");
@@ -195,11 +181,7 @@ export async function marcarPago(itemId: number, valorPago: number, dataPagament
 }
 
 export async function updateDataVencimento(cobrancaId: number, dataVencimento: string) {
-  await prisma.cobrancaMensal.update({
-    where: { id: cobrancaId },
-    data: { dataVencimento },
-  });
-
+  await prisma.cobrancaMensal.update({ where: { id: cobrancaId }, data: { dataVencimento } });
   revalidatePath("/cobrancas", "layout");
 }
 
