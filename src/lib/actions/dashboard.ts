@@ -32,8 +32,12 @@ export async function getDashboardData() {
 
   // O parâmetro foi definido como 'i', então dentro deve ser 'i'
   const totalEmAtraso = inadimplentes.reduce(
-    (sum, i) => sum + (Number(i.totalAPagar) - Number(i.valorPago)),
-    0
+    (sum, i) => {
+      const aPagar = Number(i.totalAPagar) || 0;
+      const pago = Number(i.valorPago) || 0;
+      return sum + (aPagar - pago);
+    },
+    0 // Garante que o acumulador começa estritamente como o número 0
   );
 
   return {
