@@ -44,9 +44,9 @@ export async function createPrestacao(formData: FormData) {
   const receitas: { descricao: string; valor: number; origem: string }[] = [];
 
   if (cobranca) {
-    const totalTaxas = cobranca.itens.reduce((sum, i) => sum + i.taxaCondominio, 0);
-    const totalExtras = cobranca.itens.reduce((sum, i) => sum + i.taxaExtra, 0);
-    const totalGas = cobranca.itens.reduce((sum, i) => sum + i.valorGas, 0);
+    const totalTaxas = cobranca.itens.reduce((sum, i) => sum + Number(i.taxaCondominio), 0);
+    const totalExtras = cobranca.itens.reduce((sum, i) => sum + Number(i.taxaExtra), 0);
+    const totalGas = cobranca.itens.reduce((sum, i) => sum + Number(i.valorGas), 0);
 
     if (totalTaxas > 0) {
       receitas.push({ descricao: "Taxa de condomínio", valor: totalTaxas, origem: "cobranca" });
@@ -90,11 +90,11 @@ async function recalcularPrestacao(prestacaoId: number) {
 
   if (!prestacao) return;
 
-  const totalReceitas = prestacao.receitas.reduce((sum, r) => sum + r.valor, 0);
-  const totalDespesas = prestacao.despesas.reduce((sum, d) => sum + d.valor, 0);
-  const totalAtrasos = prestacao.atrasos.reduce((sum, a) => sum + a.valor, 0);
-  const totalCreditos = prestacao.creditos.reduce((sum, c) => sum + c.valor, 0);
-  const creditoMes = prestacao.saldoMesAnterior + totalReceitas - totalDespesas - totalAtrasos + totalCreditos;
+  const totalReceitas = prestacao.receitas.reduce((sum, r) => sum + Number(r.valor), 0);
+  const totalDespesas = prestacao.despesas.reduce((sum, d) => sum + Number(d.valor), 0);
+  const totalAtrasos = prestacao.atrasos.reduce((sum, a) => sum + Number(a.valor), 0);
+  const totalCreditos = prestacao.creditos.reduce((sum, c) => sum + Number(c.valor), 0);
+  const creditoMes = Number(prestacao.saldoMesAnterior) + totalReceitas - totalDespesas - totalAtrasos + totalCreditos;
 
   await prisma.prestacaoContas.update({
     where: { id: prestacaoId },
@@ -204,17 +204,17 @@ export async function addMovimentacao(prestacaoId: number, formData: FormData) {
   if (conta === "reserva_gas") {
     await prisma.prestacaoContas.update({
       where: { id: prestacaoId },
-      data: { saldoReservaGas: prestacao.saldoReservaGas + ajuste },
+      data: { saldoReservaGas: Number(prestacao.saldoReservaGas) + ajuste },
     });
   } else if (conta === "conta_corrente") {
     await prisma.prestacaoContas.update({
       where: { id: prestacaoId },
-      data: { saldoContaCorrente: prestacao.saldoContaCorrente + ajuste },
+      data: { saldoContaCorrente: Number(prestacao.saldoContaCorrente) + ajuste },
     });
   } else if (conta === "poupanca") {
     await prisma.prestacaoContas.update({
       where: { id: prestacaoId },
-      data: { saldoPoupanca: prestacao.saldoPoupanca + ajuste },
+      data: { saldoPoupanca: Number(prestacao.saldoPoupanca) + ajuste },
     });
   }
 
@@ -241,12 +241,12 @@ export async function deleteMovimentacao(id: number, prestacaoId: number) {
   const prestacao = await prisma.prestacaoContas.findUnique({ where: { id: prestacaoId } });
   if (!prestacao) return;
 
-  let newSaldoReservaGas = prestacao.saldoReservaGas;
-  let newSaldoContaCorrente = prestacao.saldoContaCorrente;
-  let newSaldoPoupanca = prestacao.saldoPoupanca;
+  let newSaldoReservaGas = Number(prestacao.saldoReservaGas);
+  let newSaldoContaCorrente = Number(prestacao.saldoContaCorrente);
+  let newSaldoPoupanca = Number(prestacao.saldoPoupanca);
 
   // Revert its effect on balances
-  const revertAjuste = mov.tipo === "entrada" ? -mov.valor : mov.valor;
+  const revertAjuste = mov.tipo === "entrada" ? -Number(mov.valor) : Number(mov.valor);
   if (mov.conta === "reserva_gas") {
     newSaldoReservaGas += revertAjuste;
   } else if (mov.conta === "conta_corrente") {
@@ -283,12 +283,12 @@ export async function updateMovimentacao(id: number, prestacaoId: number, formDa
   if (!prestacao) return;
 
   // Compute the new balances
-  let newSaldoReservaGas = prestacao.saldoReservaGas;
-  let newSaldoContaCorrente = prestacao.saldoContaCorrente;
-  let newSaldoPoupanca = prestacao.saldoPoupanca;
+  let newSaldoReservaGas = Number(prestacao.saldoReservaGas);
+  let newSaldoContaCorrente = Number(prestacao.saldoContaCorrente);
+  let newSaldoPoupanca = Number(prestacao.saldoPoupanca);
 
   // 1. Revert old movimentacao
-  const revertAjuste = oldMov.tipo === "entrada" ? -oldMov.valor : oldMov.valor;
+  const revertAjuste = oldMov.tipo === "entrada" ? -Number(oldMov.valor) : Number(oldMov.valor);
   if (oldMov.conta === "reserva_gas") {
     newSaldoReservaGas += revertAjuste;
   } else if (oldMov.conta === "conta_corrente") {
