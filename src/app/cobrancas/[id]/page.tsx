@@ -15,5 +15,13 @@ export default async function CobrancaDetalhePage({ params }: PageProps) {
     notFound();
   }
 
-  return <CobrancaDetalheClient cobranca={cobranca} />;
+  // Tratamento seguro: garante que vire string independente de vir Date ou String do banco
+  const cobrancaFormatada = {
+    ...cobranca,
+    dataVencimento: cobranca.dataVencimento
+      ? new Date(cobranca.dataVencimento).toISOString()
+      : "",
+  };
+
+  return <CobrancaDetalheClient cobranca={cobrancaFormatada as any} />;
 }
