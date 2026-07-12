@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 const dadosJunho2026 = [
   { numero: "101", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 1342, leituraAtual: 1343, consumo: 1, precoM3: 21.50 },
   { numero: "102", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 3265, leituraAtual: 3269, consumo: 4, precoM3: 21.50 },
-  { numero: "103", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 0,    leituraAtual: 0,    consumo: 0, precoM3: 0 },
-  { numero: "201", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 683,  leituraAtual: 684,  consumo: 1, precoM3: 21.50 },
+  { numero: "103", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 0, leituraAtual: 0, consumo: 0, precoM3: 0 },
+  { numero: "201", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 683, leituraAtual: 684, consumo: 1, precoM3: 21.50 },
   { numero: "202", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 1406, leituraAtual: 1407, consumo: 1, precoM3: 21.50 },
-  { numero: "203", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 611,  leituraAtual: 612,  consumo: 1, precoM3: 21.50 },
+  { numero: "203", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 611, leituraAtual: 612, consumo: 1, precoM3: 21.50 },
   { numero: "301", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 1204, leituraAtual: 1206, consumo: 2, precoM3: 21.50 },
   { numero: "302", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 1703, leituraAtual: 1704, consumo: 1, precoM3: 21.50 },
   { numero: "303", taxaCondominio: 393, taxaExtra: 10, leituraAnterior: 1352, leituraAtual: 1355, consumo: 3, precoM3: 21.50 },
@@ -111,7 +111,7 @@ async function main() {
     );
   }
 
-  const totalGeral = cobranca.itens.reduce((s, i) => s + i.totalAPagar, 0);
+  const totalGeral = cobranca.itens.reduce((s, i) => s + Number(i.totalAPagar), 0);
   console.log("─".repeat(90));
   console.log(`${"TOTAL".padEnd(6)}${" ".repeat(58)}${""}${`R$ ${totalGeral.toFixed(2)}`.padStart(12)}`);
 }
