@@ -30,6 +30,7 @@ export async function getDashboardData() {
   // Cálculo dinâmico baseado na prestação de contas (Receitas - Despesas)
   const creditoMes = Number(totalRecebido) - Number(totalDespesas);
 
+  // O parâmetro foi definido como 'i', então dentro deve ser 'i'
   const totalEmAtraso = inadimplentes.reduce(
     (sum, i) => sum + (Number(i.totalAPagar) - Number(i.valorPago)),
     0

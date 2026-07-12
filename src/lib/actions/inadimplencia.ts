@@ -32,9 +32,9 @@ export async function getInadimplencias(): Promise<Inadimplente[]> {
     itemId: item.id,
     apartamentoNumero: item.apartamento.numero,
     mesReferencia: item.cobrancaMensal.mesReferencia,
-    totalAPagar: Number(item.totalAPagar), // Convertido para number
-    valorPago: Number(item.valorPago),     // Convertido para number
-    valorEmAberto: Number(item.totalAPagar) - Number(item.valorPago), // Garante o cálculo seguro
+    totalAPagar: Number(item.totalAPagar),
+    valorPago: Number(item.valorPago),
+    valorEmAberto: Number(item.totalAPagar) - Number(item.valorPago),
     statusPagamento: item.statusPagamento,
   }));
 }
@@ -60,7 +60,7 @@ export async function registrarPagamentoInadimplencia(
     data: {
       valorPago: totalPago,
       statusPagamento: status,
-      dataPagamento: dataPagamento ? new Date(dataPagamento) : null,
+      dataPagamento,
     },
   });
 
