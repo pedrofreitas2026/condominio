@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     },
     {
       label: "Total Recebido",
-      value: formatCurrency(data.totalRecebido),
+      value: formatCurrency(Number(data.totalRecebido)),
       gradient: "gradient-card-green",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     },
     {
       label: "Total em Atraso",
-      value: formatCurrency(data.totalEmAtraso),
+      value: formatCurrency(Number(data.totalEmAtraso)),
       gradient: "gradient-card-red",
       subtitle: `${data.qtdInadimplentes} pendência(s)`,
       icon: (
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
     },
     {
       label: "Despesas do Mês",
-      value: formatCurrency(data.totalDespesas),
+      value: formatCurrency(Number(data.totalDespesas)),
       gradient: "gradient-card-amber",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
@@ -53,10 +53,10 @@ export default async function DashboardPage() {
     },
     {
       label: "Crédito/Déficit",
-      value: formatCurrency(data.creditoMes),
-      gradient: data.creditoMes >= 0 ? "gradient-card-green" : "gradient-card-red",
+      value: formatCurrency(Number(data.creditoMes)),
+      gradient: Number(data.creditoMes) >= 0 ? "gradient-card-green" : "gradient-card-red",
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={data.creditoMes >= 0 ? "text-emerald-400" : "text-red-400"}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={Number(data.creditoMes) >= 0 ? "text-emerald-400" : "text-red-400"}>
           <line x1="12" x2="12" y1="2" y2="22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       ),
@@ -66,17 +66,17 @@ export default async function DashboardPage() {
   const saldos = [
     {
       label: "Reserva para Gás",
-      value: formatCurrency(data.saldoReservaGas),
+      value: formatCurrency(Number(data.saldoReservaGas)),
       color: "text-blue-400",
     },
     {
       label: "Conta Corrente",
-      value: formatCurrency(data.saldoContaCorrente),
+      value: formatCurrency(Number(data.saldoContaCorrente)),
       color: "text-emerald-400",
     },
     {
       label: "Conta Poupança",
-      value: formatCurrency(data.saldoPoupanca),
+      value: formatCurrency(Number(data.saldoPoupanca)),
       color: "text-purple-400",
     },
   ];
