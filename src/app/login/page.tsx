@@ -17,29 +17,22 @@ export default function LoginPage() {
         setCarregando(true);
 
         try {
-            const res = await fetch("/api/auth/login", {
+            // Certifique-se de que está exatamente assim:
+            const res = await fetch("/api/auth/login", { // <-- Precisa começar com "/" e ser minúsculo
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, senha }),
             });
 
-            // SE O SERVIDOR DEVOLVER ERRO (404 OU 500), VAMOS PEGAR O TEXTO HTML DELE
-            if (!res.ok) {
-                const textoErro = await res.text();
-                console.error("CONTEÚDO RECEBIDO DO SERVIDOR:", textoErro);
+            const dados = await res.json();
 
-                // Se for um erro conhecido da nossa API que veio em JSON, tenta extrair, senão mostra o status
-                try {
-                    const jsonErro = JSON.parse(textoErro);
-                    throw new Error(jsonErro.error || "Falha ao realizar login");
-                } catch {
-                    throw new Error(`Erro no Servidor (${res.status}): Verifique o console do terminal.`);
-                }
+            if (!res.ok) {
+                throw new Error(dados.error || "Falha ao realizar login");
             }
 
-            const dados = await res.json();
+            // Redireciona para a página de relatórios após o login bem-sucedido
             router.push("/relatorios");
-            router.refresh();
+            router.refresh(); // Força o Next.js a reavaliar os cookies no servidor
         } catch (err: any) {
             setErro(err.message);
         } finally {
