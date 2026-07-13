@@ -4,6 +4,14 @@ import { useState } from "react";
 import { formatMesReferencia, formatDate } from "@/lib/utils";
 import Link from "next/link";
 
+// ================= TIPAGENS =================
+interface UsuarioLogado {
+  id: number;
+  nome: string;
+  role: "sindico" | "morador";
+  apartamento?: string; // Obrigatório se role for 'morador'
+}
+
 interface CobrancaItem {
   id: number;
   apartamento: { numero: string };
@@ -16,7 +24,7 @@ interface CobrancaItem {
   valorGas: number;
   totalAPagar: number;
   valorPago: number;
-  statusPagamento: string;
+  statusPagamento: string; // Ex: "PAGO" ou "PENDENTE"
 }
 
 interface Cobranca {
@@ -58,20 +66,103 @@ interface Prestacao {
   despesas: Despesa[];
 }
 
-type ReportType = "cobranca" | "prestacao";
+type ReportType = "cobranca" | "prestacao" | "recibo";
 
+// ================= SUBCOMPONENTE DE RECIBO =================
+interface ReciboImpressaoProps {
+  cobranca: Cobranca;
+  item: CobrancaItem;
+  formatCurrency: (value: number) => string;
+}
+
+function ReciboImpressao({ cobranca, item, formatCurrency }: ReciboImpressaoProps) {
+  return (
+    <div className="print-layout page-container-recibo" style={{ padding: "24px", color: "#000", backgroundColor: "#fff", border: "1px dashed #000" }}>
+      <style jsx global>{`
+        @media print {
+          .page-container-recibo {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
+      <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: "12px", marginBottom: "16px" }}>
+        <h1 style={{ fontSize: "16pt", fontWeight: "bold", margin: "0" }}>CONDOMÍNIO JOSÉ MARCOLINI</h1>
+        <h2 style={{ fontSize: "12pt", fontWeight: "bold", margin: "4px 0 0 0", color: "#333" }}>
+          RECIBO DE PAGAMENTO DE CONDOMÍNIO
+        </h2>
+      </div>
+
+      <div style={{ fontSize: "11pt", lineHeight: "1.6", marginBottom: "24px", textAlign: "justify" }}>
+        <p>
+          Confirmamos que o <strong>Apartamento {item.apartamento.numero}</strong> efetuou o pagamento do valor de{" "}
+          <strong>{formatCurrency(item.valorPago || item.totalAPagar)}</strong> referente à taxa condominial e despesas rateadas do mês de{" "}
+          <strong>{formatMesReferencia(cobranca.mesReferencia).toUpperCase()}</strong>, estando quitadas as obrigações listadas abaixo.
+        </p>
+
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid #000" }}>
+              <th style={{ textAlign: "left", padding: "6px 0" }}>Descrição</th>
+              <th style={{ textAlign: "right", padding: "6px 0" }}>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ padding: "6px 0" }}>Taxa de Condomínio Ordinária</td>
+              <td style={{ textAlign: "right" }}>{formatCurrency(item.taxaCondominio)}</td>
+            </tr>
+            {item.taxaExtra > 0 && (
+              <tr>
+                <td style={{ padding: "6px 0" }}>Taxa Extra / Fundo de Reserva</td>
+                <td style={{ textAlign: "right" }}>{formatCurrency(item.taxaExtra)}</td>
+              </tr>
+            )}
+            {item.valorGas > 0 && (
+              <tr>
+                <td style={{ padding: "6px 0" }}>Consumo Individual de Gás ({item.consumoGas} m³)</td>
+                <td style={{ textAlign: "right" }}>{formatCurrency(item.valorGas)}</td>
+              </tr>
+            )}
+            <tr style={{ borderTop: "1px solid #000", fontWeight: "bold" }}>
+              <td style={{ padding: "8px 0" }}>Total Liquidado</td>
+              <td style={{ textAlign: "right", padding: "8px 0" }}>{formatCurrency(item.valorPago || item.totalAPagar)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: "48px", textAlign: "center" }}>
+        <div style={{ width: "250px", borderTop: "1px solid #000", margin: "0 auto", paddingBottom: "4px" }}>
+          Administração / Síndico
+        </div>
+        <p style={{ fontSize: "9pt", color: "#666", margin: "4px 0 0 0" }}>
+          Emitido via sistema em {new Date().toLocaleDateString("pt-BR")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ================= COMPONENTE PRINCIPAL =================
 export default function RelatoriosClient({
   cobrancas,
   prestacoes,
+  usuarioLogado = { id: 0, nome: "Síndico", role: "sindico" },
 }: {
-  cobrancas: Cobranca[];
+  cobrancas: Cobranca[]; // <-- Força explicitamente o tipo do array de cobranças
   prestacoes: Prestacao[];
+  usuarioLogado?: UsuarioLogado;
 }) {
   const [tipo, setTipo] = useState<ReportType>("cobranca");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [itemReciboSelecionado, setItemReciboSelecionado] = useState<CobrancaItem | null>(null);
 
   const selectedCobranca = cobrancas.find((c) => c.id === selectedId);
   const selectedPrestacao = prestacoes.find((p) => p.id === selectedId);
+
+  const isMorador = usuarioLogado.role === "morador";
 
   const formatCurrency = (value: number | string | null | undefined) => {
     const amount = Number(value ?? 0);
@@ -88,9 +179,27 @@ export default function RelatoriosClient({
     ? selectedPrestacao.totalReceitas - selectedPrestacao.totalDespesas
     : 0;
 
+  // Filtragem estrita de segurança para moradores nas cobranças
+  const obterCobrancaFiltrada = () => {
+    if (!selectedCobranca) return null;
+    if (!isMorador) return selectedCobranca;
+
+    // Se for morador, filtra apenas a linha correspondente ao seu apartamento
+    const itensFiltrados = selectedCobranca.itens.filter(
+      (item) => item.apartamento.numero === usuarioLogado.apartamento
+    );
+
+    return {
+      ...selectedCobranca,
+      itens: itensFiltrados,
+      totalGeral: itensFiltrados.reduce((acc, curr) => acc + curr.totalAPagar, 0),
+    };
+  };
+
+  const cobrancaExibida = obterCobrancaFiltrada();
+
   return (
     <div className="fade-in">
-      {/* Injeção de estilo específica para travar a impressão em 1 página */}
       <style jsx global>{`
         @media print {
           .page-container-prestacao {
@@ -105,12 +214,15 @@ export default function RelatoriosClient({
         }
       `}</style>
 
+      {/* Header */}
       <div className="flex items-center justify-between mb-8 no-print">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Relatórios</h1>
-          <p className="text-text-secondary mt-1">Gere relatórios para impressão</p>
+          <p className="text-text-secondary mt-1">
+            {isMorador ? "Consulte suas taxas e emissões" : "Gere relatórios para impressão"}
+          </p>
         </div>
-        {selectedId && (
+        {selectedId && tipo !== "recibo" && (
           <button onClick={() => window.print()} className="btn-primary">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect width="12" height="8" x="6" y="14" />
@@ -127,51 +239,80 @@ export default function RelatoriosClient({
             <label className="block text-sm text-text-secondary mb-1">Tipo de Relatório</label>
             <select
               className="input-field"
-              value={tipo}
+              value={tipo === "recibo" ? "cobranca" : tipo}
               onChange={(e) => {
                 setTipo(e.target.value as ReportType);
                 setSelectedId(null);
+                setItemReciboSelecionado(null);
               }}
             >
               <option value="cobranca">Cobrança Mensal</option>
-              <option value="prestacao">Prestação de Contas</option>
+              {/* Oculta totalmente a opção do seletor se o usuário logado for morador */}
+              {!isMorador && <option value="prestacao">Prestação de Contas</option>}
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm text-text-secondary mb-1">Período</label>
-            <select
-              className="input-field"
-              value={selectedId ?? ""}
-              onChange={(e) => setSelectedId(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Selecione...</option>
-              {tipo === "cobranca"
-                ? cobrancas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {formatMesReferencia(c.mesReferencia)}
-                  </option>
-                ))
-                : prestacoes.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {formatMesReferencia(p.mesReferencia)}
-                  </option>
-                ))}
-            </select>
-          </div>
+          {tipo !== "recibo" && (
+            <div>
+              <label className="block text-sm text-text-secondary mb-1">Período</label>
+              <select
+                className="input-field"
+                value={selectedId ?? ""}
+                onChange={(e) => setSelectedId(e.target.value ? parseInt(e.target.value) : null)}
+              >
+                <option value="">Selecione...</option>
+                {tipo === "cobranca"
+                  ? cobrancas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {formatMesReferencia(c.mesReferencia)}
+                    </option>
+                  ))
+                  : prestacoes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {formatMesReferencia(p.mesReferencia)}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Recibo View Render (Foco de impressão isolado) */}
+      {tipo === "recibo" && selectedCobranca && itemReciboSelecionado && (
+        <div className="mt-4">
+          <div className="flex gap-2 mb-4 no-print">
+            <button
+              onClick={() => { setTipo("cobranca"); setItemReciboSelecionado(null); }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition"
+            >
+              ← Voltar para Listagem
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition"
+            >
+              Imprimir Recibo
+            </button>
+          </div>
+          <ReciboImpressao
+            cobranca={selectedCobranca}
+            item={itemReciboSelecionado}
+            formatCurrency={formatCurrency}
+          />
+        </div>
+      )}
+
       {/* Billing Report */}
-      {tipo === "cobranca" && selectedCobranca && (
+      {tipo === "cobranca" && cobrancaExibida && (
         <div className="glass-card rounded-2xl p-6">
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold">Condomínio José Marcolini</h2>
             <h3 className="text-lg text-text-secondary mt-1">
-              TAXA — {formatMesReferencia(selectedCobranca.mesReferencia)}
+              TAXA — {formatMesReferencia(cobrancaExibida.mesReferencia)}
             </h3>
             <p className="text-sm text-text-muted mt-1">
-              Vencimento: {formatDate(selectedCobranca.dataVencimento)}
+              Vencimento: {formatDate(cobrancaExibida.dataVencimento)}
             </p>
           </div>
 
@@ -188,10 +329,11 @@ export default function RelatoriosClient({
                   <th className="text-right">Preço m³</th>
                   <th className="text-right">Valor Gás</th>
                   <th className="text-right">Total</th>
+                  <th className="text-center no-print">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {selectedCobranca.itens.map((item) => (
+                {cobrancaExibida.itens.map((item) => (
                   <tr key={item.id}>
                     <td className="font-semibold">{item.apartamento.numero}</td>
                     <td className="text-right">{formatCurrency(item.taxaCondominio)}</td>
@@ -202,29 +344,50 @@ export default function RelatoriosClient({
                     <td className="text-right">{formatCurrency(item.precoGasM3)}</td>
                     <td className="text-right">{formatCurrency(item.valorGas)}</td>
                     <td className="text-right font-semibold">{formatCurrency(item.totalAPagar)}</td>
+                    <td className="text-center no-print">
+                      {item.statusPagamento === "PAGO" ? (
+                        <button
+                          onClick={() => {
+                            setItemReciboSelecionado(item);
+                            setTipo("recibo");
+                          }}
+                          className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700 transition"
+                        >
+                          Recibo
+                        </button>
+                      ) : (
+                        <span className="text-xs text-red-400 font-medium bg-red-950/30 px-2 py-1 rounded">
+                          Pendente
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr>
-                  <td className="font-bold">Totais</td>
-                  <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalTaxas)}</td>
-                  <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalExtras)}</td>
-                  <td></td>
-                  <td></td>
-                  <td className="text-right font-bold">{selectedCobranca.totalConsumoGas}</td>
-                  <td></td>
-                  <td className="text-right font-bold">{formatCurrency(selectedCobranca.totalGas)}</td>
-                  <td className="text-right font-bold text-primary-300">{formatCurrency(selectedCobranca.totalGeral)}</td>
-                </tr>
-              </tfoot>
+              {/* O rodapé de totais gerais só faz sentido visual se o síndico estiver visualizando todos */}
+              {!isMorador && (
+                <tfoot>
+                  <tr>
+                    <td className="font-bold">Totais</td>
+                    <td className="text-right font-bold">{formatCurrency(cobrancaExibida.totalTaxas)}</td>
+                    <td className="text-right font-bold">{formatCurrency(cobrancaExibida.totalExtras)}</td>
+                    <td></td>
+                    <td></td>
+                    <td className="text-right font-bold">{cobrancaExibida.totalConsumoGas}</td>
+                    <td></td>
+                    <td className="text-right font-bold">{formatCurrency(cobrancaExibida.totalGas)}</td>
+                    <td className="text-right font-bold text-primary-300">{formatCurrency(cobrancaExibida.totalGeral)}</td>
+                    <td className="no-print"></td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
       )}
 
-      {/* Financial Statement Report */}
-      {tipo === "prestacao" && selectedPrestacao && (
+      {/* Financial Statement Report (Bloqueado via JS caso tente burlar a URL ou estado) */}
+      {tipo === "prestacao" && selectedPrestacao && !isMorador && (
         <div className="glass-card rounded-2xl p-6 page-container-prestacao">
           {/* ============ PRINT LAYOUT ============ */}
           <div className="print-layout">
@@ -238,7 +401,6 @@ export default function RelatoriosClient({
             </div>
           </div>
 
-          {/* Mudança de grid-cols-1 para md:grid-cols-2 apenas em telas, mas forçado a 2 colunas lado a lado na impressão */}
           <div className="grid grid-cols-2 gap-6 mt-4 [media_print]:grid-cols-2">
             {/* Receitas */}
             <div>
