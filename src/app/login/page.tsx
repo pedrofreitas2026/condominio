@@ -17,6 +17,7 @@ export default function LoginPage() {
         setCarregando(true);
 
         try {
+            // Certifique-se de que está exatamente assim:
             const res = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
