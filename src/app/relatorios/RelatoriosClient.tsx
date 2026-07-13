@@ -84,13 +84,27 @@ export default function RelatoriosClient({
     }).format(Number.isFinite(amount) ? amount : 0);
   };
 
-  // Armazena o cálculo dinâmico da prestação selecionada
   const valorCreditoDeficit = selectedPrestacao
     ? selectedPrestacao.totalReceitas - selectedPrestacao.totalDespesas
     : 0;
 
   return (
     <div className="fade-in">
+      {/* Injeção de estilo específica para travar a impressão em 1 página */}
+      <style jsx global>{`
+        @media print {
+          .page-container-prestacao {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            max-height: 100vh;
+          }
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
+
       <div className="flex items-center justify-between mb-8 no-print">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Relatórios</h1>
@@ -211,7 +225,7 @@ export default function RelatoriosClient({
 
       {/* Financial Statement Report */}
       {tipo === "prestacao" && selectedPrestacao && (
-        <div className="glass-card rounded-2xl p-6">
+        <div className="glass-card rounded-2xl p-6 page-container-prestacao">
           {/* ============ PRINT LAYOUT ============ */}
           <div className="print-layout">
             <div style={{ textAlign: "center", marginBottom: "15px" }}>
@@ -224,11 +238,12 @@ export default function RelatoriosClient({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          {/* Mudança de grid-cols-1 para md:grid-cols-2 apenas em telas, mas forçado a 2 colunas lado a lado na impressão */}
+          <div className="grid grid-cols-2 gap-6 mt-4 [media_print]:grid-cols-2">
             {/* Receitas */}
             <div>
-              <h4 className="font-bold text-emerald-400 mb-3 print-color-adjust">Receitas</h4>
-              <table className="data-table">
+              <h4 className="font-bold text-emerald-400 mb-2 print-color-adjust">Receitas</h4>
+              <table className="data-table text-sm">
                 <tbody>
                   {selectedPrestacao.receitas.map((r) => (
                     <tr key={r.id}>
@@ -248,8 +263,8 @@ export default function RelatoriosClient({
 
             {/* Despesas */}
             <div>
-              <h4 className="font-bold text-red-400 mb-3 print-color-adjust">Despesas</h4>
-              <table className="data-table">
+              <h4 className="font-bold text-red-400 mb-2 print-color-adjust">Despesas</h4>
+              <table className="data-table text-sm">
                 <tbody>
                   {selectedPrestacao.despesas.map((d) => (
                     <tr key={d.id}>
@@ -269,26 +284,26 @@ export default function RelatoriosClient({
           </div>
 
           {/* Result */}
-          <div className="mt-6 p-4 bg-surface rounded-xl border border-border text-center print-border-adjust">
-            <p className="text-text-secondary mb-1">Crédito/Déficit do Mês</p>
-            <p className={`text-2xl font-bold ${valorCreditoDeficit >= 0 ? "text-emerald-400" : "text-red-400"} print-color-adjust`}>
+          <div className="mt-4 p-3 bg-surface rounded-xl border border-border text-center print-border-adjust">
+            <p className="text-text-secondary text-xs mb-1">Crédito/Déficit do Mês</p>
+            <p className={`text-xl font-bold ${valorCreditoDeficit >= 0 ? "text-emerald-400" : "text-red-400"} print-color-adjust`}>
               {formatCurrency(valorCreditoDeficit)}
             </p>
           </div>
 
           {/* Balances */}
-          <div className="mt-6 grid grid-cols-3 gap-4">
-            <div className="p-3 bg-surface rounded-xl border border-border text-center print-border-adjust">
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="p-2 bg-surface rounded-xl border border-border text-center print-border-adjust">
               <p className="text-xs text-text-muted mb-1">Reserva Gás</p>
-              <p className="font-bold text-blue-400 print-color-adjust">{formatCurrency(selectedPrestacao.saldoReservaGas)}</p>
+              <p className="font-bold text-blue-400 print-color-adjust text-sm">{formatCurrency(selectedPrestacao.saldoReservaGas)}</p>
             </div>
-            <div className="p-3 bg-surface rounded-xl border border-border text-center print-border-adjust">
+            <div className="p-2 bg-surface rounded-xl border border-border text-center print-border-adjust">
               <p className="text-xs text-text-muted mb-1">Conta Corrente</p>
-              <p className="font-bold text-emerald-400 print-color-adjust">{formatCurrency(selectedPrestacao.saldoContaCorrente)}</p>
+              <p className="font-bold text-emerald-400 print-color-adjust text-sm">{formatCurrency(selectedPrestacao.saldoContaCorrente)}</p>
             </div>
-            <div className="p-3 bg-surface rounded-xl border border-border text-center print-border-adjust">
+            <div className="p-2 bg-surface rounded-xl border border-border text-center print-border-adjust">
               <p className="text-xs text-text-muted mb-1">Poupança</p>
-              <p className="font-bold text-purple-400 print-color-adjust">{formatCurrency(selectedPrestacao.saldoPoupanca)}</p>
+              <p className="font-bold text-purple-400 print-color-adjust text-sm">{formatCurrency(selectedPrestacao.saldoPoupanca)}</p>
             </div>
           </div>
         </div>
@@ -297,7 +312,7 @@ export default function RelatoriosClient({
       {/* No selection */}
       {!selectedId && (
         <div className="glass-card rounded-2xl p-12 text-center no-print">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-text-muted">
+          <svg xmlns="http://www.w3.org/2000/xl" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-text-muted">
             <path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m7 17 4-8 4 4 4-6" />
           </svg>
           <p className="text-text-secondary text-lg">Selecione um período para gerar o relatório</p>
