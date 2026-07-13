@@ -1,7 +1,6 @@
 // @/app/relatorios/page.tsx
 import RelatoriosClient from "./RelatoriosClient";
 
-// 1. Definição local das interfaces para o servidor reconhecer os tipos dos arrays vazios
 interface CobrancaItem {
   id: number;
   apartamento: { numero: string };
@@ -44,16 +43,89 @@ interface Prestacao {
 }
 
 export default async function RelatoriosPage() {
-  // 2. Tipagem explícita adicionada aos arrays vazios para eliminar os erros de 'any[]'
-  const cobrancas: Cobranca[] = [];
-  const prestacoes: Prestacao[] = [];
+  // Dados simulados para você testar a filtragem por apartamento e a emissão do recibo
+  const cobrancas: Cobranca[] = [
+    {
+      id: 1,
+      mesReferencia: "2026-07",
+      dataVencimento: "2026-07-10",
+      precoGasM3Padrao: 8.5,
+      totalGeral: 750,
+      totalTaxas: 600,
+      totalExtras: 0,
+      totalGas: 150,
+      totalConsumoGas: 17.6,
+      itens: [
+        {
+          id: 101,
+          apartamento: { numero: "101" },
+          taxaCondominio: 300,
+          taxaExtra: 0,
+          leituraAnteriorGas: 100,
+          leituraAtualGas: 110,
+          consumoGas: 10,
+          precoGasM3: 8.5,
+          valorGas: 85,
+          totalAPagar: 385,
+          valorPago: 385,
+          statusPagamento: "PAGO", // Gera o botão de Recibo
+        },
+        {
+          id: 102,
+          apartamento: { numero: "102" },
+          taxaCondominio: 300,
+          taxaExtra: 0,
+          leituraAnteriorGas: 150,
+          leituraAtualGas: 157.6,
+          consumoGas: 7.6,
+          precoGasM3: 8.5,
+          valorGas: 64.6,
+          totalAPagar: 364.6,
+          valorPago: 0,
+          statusPagamento: "PENDENTE", // Mostra a badge de Pendente
+        },
+      ],
+    },
+  ];
 
-  // 3. Adicionado 'as const' para fixar o tipo literal da propriedade role como '"sindico"' em vez de 'string'
+  const prestacoes: Prestacao[] = [
+    {
+      id: 1,
+      mesReferencia: "2026-07",
+      totalReceitas: 5000,
+      totalDespesas: 4200,
+      creditoMes: 800,
+      saldoReservaGas: 1200,
+      saldoContaCorrente: 3500,
+      saldoPoupanca: 15000,
+      receitas: [{ id: 1, descricao: "Taxas Condominiais", valor: 5000 }],
+      despesas: [
+        { id: 1, descricao: "Copasa", valor: 1200, categoria: "Água" },
+        { id: 2, descricao: "Cemig", valor: 3000, categoria: "Luz" },
+      ],
+    },
+  ];
+
+  // =========================================================================
+  // CONFIGURAÇÃO DE TESTE DE PERFIL (Altere aqui para validar os cenários)
+  // =========================================================================
+
+  // CENÁRIO A: SÍNDICO (Vê todas as linhas e a Prestação de Contas)
   const usuarioLogado = {
     id: 1,
     nome: "Carlos S.",
-    role: "sindico" as const, // Força o TypeScript a entender o valor exato exigido pela interface
+    role: "sindico" as const,
   };
+
+  /*
+  // CENÁRIO B: MORADOR DO 101 (Só vê a sua linha, o seu recibo e NÃO vê Prestação de Contas)
+  const usuarioLogado = {
+    id: 10,
+    nome: "Morador Apto 101",
+    role: "morador" as const,
+    apartamento: "101",
+  };
+  */
 
   return (
     <RelatoriosClient

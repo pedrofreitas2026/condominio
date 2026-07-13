@@ -151,7 +151,7 @@ export default function RelatoriosClient({
   prestacoes,
   usuarioLogado = { id: 0, nome: "Síndico", role: "sindico" },
 }: {
-  cobrancas: Cobranca[]; // <-- Força explicitamente o tipo do array de cobranças
+  cobrancas: Cobranca[];
   prestacoes: Prestacao[];
   usuarioLogado?: UsuarioLogado;
 }) {
@@ -247,7 +247,6 @@ export default function RelatoriosClient({
               }}
             >
               <option value="cobranca">Cobrança Mensal</option>
-              {/* Oculta totalmente a opção do seletor se o usuário logado for morador */}
               {!isMorador && <option value="prestacao">Prestação de Contas</option>}
             </select>
           </div>
@@ -278,7 +277,7 @@ export default function RelatoriosClient({
         </div>
       </div>
 
-      {/* Recibo View Render (Foco de impressão isolado) */}
+      {/* Recibo View Render */}
       {tipo === "recibo" && selectedCobranca && itemReciboSelecionado && (
         <div className="mt-4">
           <div className="flex gap-2 mb-4 no-print">
@@ -364,7 +363,6 @@ export default function RelatoriosClient({
                   </tr>
                 ))}
               </tbody>
-              {/* O rodapé de totais gerais só faz sentido visual se o síndico estiver visualizando todos */}
               {!isMorador && (
                 <tfoot>
                   <tr>
@@ -386,10 +384,9 @@ export default function RelatoriosClient({
         </div>
       )}
 
-      {/* Financial Statement Report (Bloqueado via JS caso tente burlar a URL ou estado) */}
+      {/* Financial Statement Report */}
       {tipo === "prestacao" && selectedPrestacao && !isMorador && (
         <div className="glass-card rounded-2xl p-6 page-container-prestacao">
-          {/* ============ PRINT LAYOUT ============ */}
           <div className="print-layout">
             <div style={{ textAlign: "center", marginBottom: "15px" }}>
               <h1 style={{ fontSize: "16pt", fontWeight: "bold", margin: "0", border: "2px solid #333", padding: "8px", background: "#f0f0f0", color: "#000" }}>
@@ -474,7 +471,7 @@ export default function RelatoriosClient({
       {/* No selection */}
       {!selectedId && (
         <div className="glass-card rounded-2xl p-12 text-center no-print">
-          <svg xmlns="http://www.w3.org/2000/xl" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-text-muted">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-text-muted">
             <path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m7 17 4-8 4 4 4-6" />
           </svg>
           <p className="text-text-secondary text-lg">Selecione um período para gerar o relatório</p>
