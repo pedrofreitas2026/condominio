@@ -1,3 +1,4 @@
+// src/app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -9,14 +10,14 @@ export async function POST(request: Request) {
   try {
     const { email, senha } = await request.json();
     const usuario = await prisma.usuario.findUnique({ where: { email } });
-    
+
     if (!usuario || !usuario.ativo) {
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+      return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
     }
 
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
     if (!senhaValida) {
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+      return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
     }
 
     const token = jwt.sign(
