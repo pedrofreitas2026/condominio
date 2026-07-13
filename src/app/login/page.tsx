@@ -18,7 +18,7 @@ export default function LoginPage() {
 
         try {
             // Certifique-se de que está exatamente assim:
-            const res = await fetch("/api/auth/login", {
+            const res = await fetch("/api/auth/login", { // <-- Precisa começar com "/" e ser minúsculo
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, senha }),
